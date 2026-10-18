@@ -13,7 +13,7 @@ We build **small-vLLM**: a C++/CUDA serving engine with a paged KV cache, contin
 
 ## Comparison with tiny-vllm
 
-[tiny-vllm](https://github.com/jmaczan/tiny-vllm) is the closest project: a single-GPU C++/CUDA engine with paged KV and continuous batching. It is a reference only; we start a fresh codebase and credit any code we adapt (see `CONTRIBUTING.md`).
+[tiny-vllm](https://github.com/jmaczan/tiny-vllm) is the closest project: a single-GPU C++/CUDA engine with paged KV and continuous batching. It is a reference only; we start a fresh codebase and credit any code we adapt in `NOTICE`.
 
 | Component | tiny-vllm | small-vLLM | Priority |
 | --- | --- | --- | --- |

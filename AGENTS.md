@@ -1,11 +1,12 @@
 # small-vLLM
 
-C++/CUDA LLM inference engine on LibTorch. What we build: `docs/design-spec.md`. How we work and the coding standards: `CONTRIBUTING.md`; follow it.
+C++/CUDA LLM inference engine on LibTorch. What we build: `docs/design-spec.md`. This file is the workflow and coding standards for people and agents alike; follow it.
 
 ## Commands
 
 ```bash
 uv sync --extra cu126                  # GPU machine; `--extra cpu` without a GPU
+uv run pre-commit install              # once: format and lint on every commit
 uv run cmake --preset release          # presets: release, debug, relwithdebinfo, cpu (no CUDA)
 uv run cmake --build --preset release
 uv run ctest --preset release
@@ -31,6 +32,31 @@ scripts/         model download, environment checks
 cmake/           torch discovery, OpenMP, pinned third-party dependencies
 docs/adr/        decisions; read the ones touching your area before changing it
 ```
+
+## Workflow
+
+- Branch off `main` as `<github-handle>/<topic>`. Every change lands through a PR, squash-merged, so the PR title becomes the commit: Conventional Commits with the area as scope, e.g. `feat(scheduler): preemption by recompute`.
+- CI has no GPU. For PRs touching kernels, the model or the engine, run the GPU tests on a GPU machine and paste the output, with the GPU name, into the PR. Benchmark numbers for the report come from the RTX 3090.
+- Record a decision that is hard to reverse as an ADR in `docs/adr/`.
+
+## Coding standards
+
+- C++20, everything in namespace `svllm`. Files `snake_case`; types `PascalCase`; functions and variables `snake_case`; private members end in `_`; constants and enumerators `kPascalCase`.
+- `.cu` for kernels, `.cuh` only for device code shared between `.cu` files, `.h`/`.cpp` for everything else.
+- Check inputs with `TORCH_CHECK`; host code may throw.
+- An op is declared in `src/ops/<op>.h`, with kernels in `src/ops/cuda/<op>.cu` and `src/ops/cpu/<op>.cpp`, and dispatches on its input's device (ADR-0002). Every op has both kernels and errors on an unsupported device.
+- Read model sizes from `config.json`. Shapes, paths and GPU architectures come from config or arguments.
+- Write a comment only when the code can't say it on its own.
+- C++ deps: FetchContent in `cmake/dependencies.cmake`, pinned to a release tarball and its SHA256. Python deps: `uv add`, and commit `uv.lock`.
+
+## Tests
+
+Test where it pays off:
+
+- **Each op:** one parametrized pytest against PyTorch at bf16 tolerance over a few shapes, including GQA ratios and block-size edges.
+- **The engine:** one end-to-end test that greedy output matches Hugging Face on a few prompts.
+- **Block manager and scheduler:** googletest cases for the tricky paths (prefix hits, eviction, preemption).
+- Getters, glue code and CLI flags need no tests.
 
 ## Rules
 

@@ -9,7 +9,6 @@ A C++/CUDA LLM inference engine on LibTorch: paged KV cache with prefix caching,
 - Linux x86_64 with an NVIDIA GPU (sm_86 or sm_89 by default; override with `-DCMAKE_CUDA_ARCHITECTURES=...`), a CUDA toolkit 12.6 or newer (torch 2.14 requires it; `nvcc` on `PATH`, or `CUDACXX` set) and a driver 525 or newer.
 - GCC 11 or newer; set `CXX` if your default `g++` is older. CMake checks the GCC and CUDA versions when it configures.
 - [uv](https://docs.astral.sh/uv/). It installs Python, torch, CMake and Ninja into `.venv`.
-- macOS (or Linux without a GPU) can build and test the CPU-only `cpu` preset.
 
 ## Quickstart
 
@@ -26,17 +25,11 @@ build/release/bin/svllm-bench --device cuda
 scripts/download_models.sh             # Qwen3-0.6B; add --llama for Llama 3.2 1B (gated on Hugging Face)
 ```
 
-## Troubleshooting
-
-- CMake still finds an old compiler or toolkit after you changed `CXX` or `CUDACXX`: it caches them from the first configure. Reconfigure with `uv run cmake --preset release --fresh`.
-- `undefined reference to cupti...@libcupti.so.12` when linking: `LD_LIBRARY_PATH` points at an older CUDA. Remove those entries; torch loads its CUDA libraries from its pip packages.
-
 ## Docs
 
 - [docs/design-spec.md](docs/design-spec.md): what we build and how we evaluate it
 - [docs/adr/](docs/adr/): decisions and why
-- [CONTRIBUTING.md](CONTRIBUTING.md): workflow, coding standards, tests
-- [AGENTS.md](AGENTS.md): instructions for AI coding agents
+- [AGENTS.md](AGENTS.md): workflow, coding standards and tests, for people and AI agents
 
 ## License
 
