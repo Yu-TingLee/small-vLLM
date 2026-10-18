@@ -35,7 +35,7 @@ docs/adr/        decisions; read the ones touching your area before changing it
 
 ## Workflow
 
-- Branch off `main` as `<github-handle>/<topic>`. Every change lands through a PR, squash-merged, so the PR title becomes the commit: Conventional Commits with the area as scope, e.g. `feat(scheduler): preemption by recompute`.
+- Branch off `main` as `<github-handle>/<topic>`. Every change lands through a PR, squash-merged, so the PR title becomes the commit: Conventional Commits without a scope, e.g. `feat: preemption by recompute`.
 - CI has no GPU. For PRs touching kernels, the model or the engine, run the GPU tests on a GPU machine and paste the output, with the GPU name, into the PR. Benchmark numbers for the report come from the RTX 3090.
 - Record a decision that is hard to reverse as an ADR in `docs/adr/`.
 
