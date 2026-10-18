@@ -1,0 +1,51 @@
+[project]
+name = "small-vllm"
+version = "0.1.0"
+description = "Tests, benchmarks and tooling for the small-vLLM C++/CUDA inference engine"
+requires-python = ">=3.11,<3.14"
+dependencies = []
+
+[project.optional-dependencies]
+# Pick one: `uv sync --extra cu126` on GPU machines, `uv sync --extra cpu` elsewhere.
+cpu = ["torch==2.14.1"]
+cu126 = ["torch==2.14.1"]
+
+[dependency-groups]
+lint = ["pre-commit>=4.6,<4.7"]
+dev = [
+  { include-group = "lint" },
+  "cmake>=3.28",
+  "ninja>=1.11",
+  "pytest>=8",
+  "transformers>=4.56",
+]
+
+[tool.uv]
+package = false
+conflicts = [[{ extra = "cpu" }, { extra = "cu126" }]]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cpu", extra = "cpu" },
+  { index = "pytorch-cu126", extra = "cu126" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]

@@ -1,0 +1,22 @@
+build/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.cache/
+
+# Model weights live in the Hugging Face cache (scripts/download_models.sh).
+*.safetensors
+*.bin
+*.pth
+models/
+
+# Profiler output
+*.nsys-rep
+*.ncu-rep
+*.qdrep
+*.sqlite
+
+.DS_Store
+.vscode/
+.idea/
