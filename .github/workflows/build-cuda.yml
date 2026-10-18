@@ -1,0 +1,21 @@
+# Compile-only: GitHub's runners have no GPU, so GPU tests run on our own machines.
+name: build-cuda
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-cuda:
+    runs-on: ubuntu-24.04
+    container: nvidia/cuda:12.6.3-devel-ubuntu24.04
+    steps:
+      - run: apt-get update && apt-get install -y --no-install-recommends ca-certificates git
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+      - run: uv sync --extra cu126 --locked
+      - run: uv run cmake --preset release
+      - run: uv run cmake --build --preset release

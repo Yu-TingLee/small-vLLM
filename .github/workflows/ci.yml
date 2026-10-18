@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+      - run: uv sync --only-group lint --locked
+      - run: uv run --no-sync pre-commit run --all-files --show-diff-on-failure
+
+  cpu-tests:
+    runs-on: ubuntu-24.04
+    env:
+      SVLLM_BUILD_DIR: build/cpu
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+      - run: uv sync --extra cpu --locked
+      - run: uv run cmake --preset cpu
+      - run: uv run cmake --build --preset cpu
+      - run: uv run ctest --preset cpu
+      - run: uv run pytest
