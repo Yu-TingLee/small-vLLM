@@ -41,3 +41,5 @@ scripts/download_models.sh             # Qwen3-0.6B; add --llama for Llama 3.2 1
 ## License
 
 Apache-2.0. Design ideas and some code come from [tiny-vllm](https://github.com/jmaczan/tiny-vllm); see [NOTICE](NOTICE).
+
+Built with Llama: the tests include Llama 3.2's `config.json`, under the [Llama 3.2 Community License](tests/cpp/data/llama-3.2-1b-instruct/LICENSE.txt).

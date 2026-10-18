@@ -3,3 +3,7 @@ Copyright 2026 The small-vLLM authors
 
 This product includes software adapted from tiny-vllm
 (https://github.com/jmaczan/tiny-vllm), licensed under the Apache License, Version 2.0.
+
+tests/cpp/data/llama-3.2-1b-instruct/config.json is a Llama Material, distributed with a copy of
+its license in the same directory. Llama 3.2 is licensed under the Llama 3.2 Community License,
+Copyright © Meta Platforms, Inc. All Rights Reserved.
