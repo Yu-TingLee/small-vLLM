@@ -9,13 +9,21 @@ on:
 jobs:
   build-cuda:
     runs-on: ubuntu-24.04
-    container: nvidia/cuda:12.6.3-devel-ubuntu24.04
     steps:
-      - run: apt-get update && apt-get install -y --no-install-recommends ca-certificates git
+      # The CUDA toolkit plus torch's CUDA wheels don't fit in the runner's default free space.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+      - name: Install CUDA 12.6 toolkit
+        run: |
+          wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i cuda-keyring_1.1-1_all.deb
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cuda-toolkit-12-6
+          echo /usr/local/cuda-12.6/bin >> "$GITHUB_PATH"
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0
-        with:
-          enable-cache: true
       - run: uv sync --extra cu126 --locked
       - run: uv run cmake --preset release
       - run: uv run cmake --build --preset release
