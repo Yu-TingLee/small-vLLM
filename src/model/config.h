@@ -30,7 +30,9 @@ struct ModelConfig {
   std::optional<Llama3RopeScaling> rope_scaling;
 };
 
-// Reads a Qwen3 or Llama config.json. Throws on other architectures or missing fields.
+// Reads a Qwen3 or Llama config.json. Throws c10::Error naming the path on other
+// architectures, missing fields or unreadable files, and c10::NotImplementedError on
+// features the forward pass lacks (attention or MLP bias, sliding window).
 ModelConfig load_model_config(const std::filesystem::path& path);
 
 }  // namespace svllm

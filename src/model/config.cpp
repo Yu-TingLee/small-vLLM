@@ -7,8 +7,9 @@
 #include <string>
 
 namespace svllm {
+namespace {
 
-ModelConfig load_model_config(const std::filesystem::path& path) {
+ModelConfig parse_model_config(const std::filesystem::path& path) {
   std::ifstream file(path);
   TORCH_CHECK(file, "cannot open ", path.string());
   const nlohmann::json j = nlohmann::json::parse(file);
@@ -16,6 +17,10 @@ ModelConfig load_model_config(const std::filesystem::path& path) {
   const auto model_type = j.at("model_type").get<std::string>();
   TORCH_CHECK(model_type == "qwen3" || model_type == "llama", "unsupported model_type '",
               model_type, "' in ", path.string(), "; expected 'qwen3' or 'llama'");
+  for (const char* flag : {"attention_bias", "mlp_bias", "use_sliding_window"}) {
+    TORCH_CHECK_NOT_IMPLEMENTED(!j.value(flag, false), flag, " is not implemented (set in ",
+                                path.string(), ")");
+  }
 
   ModelConfig config{
       .vocab_size = j.at("vocab_size").get<int64_t>(),
@@ -46,6 +51,18 @@ ModelConfig load_model_config(const std::filesystem::path& path) {
     };
   }
   return config;
+}
+
+}  // namespace
+
+ModelConfig load_model_config(const std::filesystem::path& path) {
+  try {
+    return parse_model_config(path);
+  } catch (const c10::Error&) {
+    throw;
+  } catch (const std::exception& e) {
+    TORCH_CHECK(false, "cannot load ", path.string(), ": ", e.what());
+  }
 }
 
 }  // namespace svllm

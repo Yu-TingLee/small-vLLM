@@ -1,6 +1,11 @@
+#include <c10/util/Exception.h>
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <random>
+#include <string>
 
 #include "model/config.h"
 
@@ -43,6 +48,31 @@ TEST(LoadModelConfig, Llama32) {
   EXPECT_DOUBLE_EQ(c.rope_scaling->low_freq_factor, 1.0);
   EXPECT_DOUBLE_EQ(c.rope_scaling->high_freq_factor, 4.0);
   EXPECT_EQ(c.rope_scaling->original_max_position_embeddings, 8192);
+}
+
+TEST(LoadModelConfig, ErrorNamesThePath) {
+  const std::filesystem::path dir = kDataDir / "qwen3-0.6b";
+  try {
+    load_model_config(dir);
+    FAIL() << "expected c10::Error";
+  } catch (const c10::Error& e) {
+    EXPECT_NE(std::string(e.what()).find(dir.string()), std::string::npos) << e.what();
+  }
+}
+
+TEST(LoadModelConfig, AttentionBiasIsNotImplemented) {
+  std::ifstream in(kDataDir / "qwen3-0.6b" / "config.json");
+  std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  const std::string off = "\"attention_bias\": false";
+  ASSERT_NE(text.find(off), std::string::npos);
+  text.replace(text.find(off), off.size(), "\"attention_bias\": true");
+
+  const std::filesystem::path path =
+      std::filesystem::temp_directory_path() /
+      ("svllm_config_" + std::to_string(std::random_device{}()) + ".json");
+  std::ofstream(path) << text;
+  EXPECT_THROW(load_model_config(path), c10::NotImplementedError);
+  std::filesystem::remove(path);
 }
 
 }  // namespace
