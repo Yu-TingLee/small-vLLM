@@ -1,6 +1,6 @@
 # small-vLLM design spec
 
-Final project for Parallel Programming. Decisions that are hard to reverse live in [`adr/`](adr/); this spec says what we build and how we evaluate it.
+This spec says what we build and how we evaluate it.
 
 ## Goal and scope
 
@@ -18,7 +18,7 @@ We build **small-vLLM**: a C++/CUDA serving engine with a paged KV cache, contin
 | Component | tiny-vllm | small-vLLM | Priority |
 | --- | --- | --- | --- |
 | Model | Llama 3.2 1B; sizes hardcoded | Qwen3-0.6B; Llama 3.2 1B through `config.json` flags; sizes read from `config.json` | Must |
-| Tensors | Raw CUDA pointers | LibTorch tensors (ADR-0001) | Must |
+| Tensors | Raw CUDA pointers | LibTorch tensors | Must |
 | Tokenizer | Python (Hugging Face) | tokenizers-cpp | Must |
 | Block manager | Paged KV cache | Paged KV cache + prefix caching | Must |
 | Scheduler | Continuous batching; a new prompt's prefill pauses the batch | Continuous batching; preemption by recompute | Must |
@@ -42,9 +42,9 @@ We build **small-vLLM**: a C++/CUDA serving engine with a paged KV cache, contin
 
 ## Architecture
 
-C++20 and CUDA throughout, on the LibTorch bundled with the pinned pip `torch` (ADR-0001).
+C++20 and CUDA throughout, on the LibTorch bundled with the pinned pip `torch`.
 
-- **One model, ops dispatched by device (ADR-0002).** The model forward is written once. Each op under `ops::` (attention, RMSNorm, RoPE, SiLU, sampling) has a CUDA and an OpenMP kernel and picks one from its input tensor's device, like PyTorch. The engine is built for one `Device`, CUDA by default or CPU; weights, the KV pool and activations live there.
+- **One model, ops dispatched by device.** The model forward is written once, so a model fix (QK-norm, Llama RoPE scaling) lands once and the CPU path can't drift from the GPU one. Each op under `ops::` (attention, RMSNorm, RoPE, SiLU, sampling) has a CUDA and an OpenMP kernel and picks one from its input tensor's device, like PyTorch; a missing kernel is an error, not a silent fallback. The engine is built for one `Device`, CUDA by default or CPU; weights, the KV pool and activations live there.
 - **Engine.** Block manager with prefix caching, scheduler with continuous batching and preemption by recompute, KV offload to host RAM, and the engine loop. All device-agnostic.
 - **Model.** Loads safetensors weights and `config.json` directly; Qwen3 by default, with Llama 3.2 differences (no QK-norm, llama3 RoPE scaling) behind config flags.
 - **Front ends.** `svllm-bench` (offline, for experiments) and `svllm-serve` (localhost HTTP plus one HTML page, for the demo). Both are thin layers over the same engine API. Changing the device or attention backend restarts the engine with new flags.

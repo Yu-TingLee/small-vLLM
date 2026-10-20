@@ -30,21 +30,20 @@ tests/python/    pytest: ops vs PyTorch, end to end vs Hugging Face
 bench/           kernel and throughput benchmarks, plotting
 scripts/         model download, environment checks
 cmake/           torch discovery, OpenMP, pinned third-party dependencies
-docs/adr/        decisions; read the ones touching your area before changing it
 ```
 
 ## Workflow
 
 - Branch off `main` as `<github-handle>/<topic>`. Every change lands through a PR, squash-merged, so the PR title becomes the commit: Conventional Commits without a scope, e.g. `feat: preemption by recompute`.
 - CI has no GPU. For PRs touching kernels, the model or the engine, run the GPU tests on a GPU machine and paste the output into the PR with the GPU, driver, CUDA and torch versions and the build preset.
-- Record a decision that is hard to reverse as an ADR in `docs/adr/`.
+- Record a decision that is hard to reverse in `docs/design-spec.md`, with the reason.
 
 ## Coding standards
 
 - C++20, everything in namespace `svllm`. Files `snake_case`; types `PascalCase`; functions and variables `snake_case`; private members end in `_`; constants and enumerators `kPascalCase`.
 - `.cu` for kernels, `.cuh` only for device code shared between `.cu` files, `.h`/`.cpp` for everything else.
 - Check inputs with `TORCH_CHECK`; host code may throw.
-- An op is declared in `src/ops/<op>.h`, with kernels in `src/ops/cuda/<op>.cu` and `src/ops/cpu/<op>.cpp`, and dispatches on its input's device (ADR-0002). Every op has both kernels and errors on an unsupported device.
+- An op is declared in `src/ops/<op>.h`, with kernels in `src/ops/cuda/<op>.cu` and `src/ops/cpu/<op>.cpp`, and dispatches on its input's device. Every op has both kernels and errors on an unsupported device.
 - Read model sizes from `config.json`. Shapes, paths and GPU architectures come from config or arguments.
 - Write a comment only when the code can't say it on its own.
 - C++ deps: FetchContent in `cmake/dependencies.cmake`, pinned to a release tarball and its SHA256. Python deps: `uv add`, and commit `uv.lock`.
@@ -62,7 +61,7 @@ Test where it pays off:
 
 - You must be able to explain every line you submit. Don't add code the task doesn't need.
 - Change only what the task needs. If you change an interface another module calls (an `ops::` signature, the `Model` or `Engine` API), list it under "Interface changes" in the PR description.
-- If your change contradicts an ADR, say so in the PR instead of silently overriding it.
+- If your change contradicts `docs/design-spec.md`, say so in the PR instead of silently overriding it.
 - Never commit model weights or files over 1 MB.
 - Never add AI attribution to commits or PRs: no `Co-Authored-By` trailer for an AI agent, no "Generated with" line.
 
@@ -74,4 +73,4 @@ Issues live in GitHub Issues for Yu-TingLee/small-vLLM, via the `gh` CLI. See `d
 
 ### Domain docs
 
-ADRs only, in `docs/adr/`; no glossary. See `docs/agents/domain.md`.
+Decisions live in `docs/design-spec.md`; no ADRs, no glossary. See `docs/agents/domain.md`.

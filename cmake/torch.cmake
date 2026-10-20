@@ -1,4 +1,4 @@
-# Python from the uv venv, and the LibTorch bundled with its pip torch (ADR-0001).
+# Python from the uv venv, and the LibTorch bundled with its pip torch.
 find_package(Python 3.11 REQUIRED COMPONENTS Interpreter Development.Module)
 
 execute_process(

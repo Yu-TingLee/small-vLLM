@@ -2,26 +2,14 @@
 
 How the engineering skills should consume this repo's domain documentation when exploring the codebase.
 
-This repo keeps **no `GLOSSARY.md`**. Decisions are recorded as ADRs only. Don't create a glossary.
+`docs/design-spec.md` is the single source of truth: what we build, and the hard-to-reverse decisions behind it. Record a new decision or term there, in the section it shapes; this repo keeps no `docs/adr/` and no `GLOSSARY.md`.
 
-## Before exploring, read these
+## Before exploring, read
 
-- **`docs/adr/`**: read ADRs that touch the area you're about to work in.
+- **`docs/design-spec.md`**: the sections that touch the area you're about to work in.
 
-If `docs/adr/` doesn't exist, **proceed silently**. Don't flag its absence; don't suggest creating it upfront. ADRs are created lazily when a hard-to-reverse decision actually gets made.
+## Flag spec conflicts
 
-## File structure
+If your output contradicts `docs/design-spec.md`, surface it explicitly rather than silently overriding:
 
-```
-/
-├── docs/adr/
-│   ├── 0001-libtorch-tensors.md
-│   └── 0002-qwen3-primary-model.md
-└── src/
-```
-
-## Flag ADR conflicts
-
-If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
-
-> _Contradicts ADR-0001 (LibTorch tensors), but worth reopening because…_
+> _Contradicts the design spec (one model, ops dispatched by device), but worth reopening because…_
