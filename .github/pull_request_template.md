@@ -18,8 +18,8 @@ None
 - [ ] Existing tests already cover the changed logic
 - [ ] No logic changed (docs, comments, config)
 
-<!-- CI has no GPU. For kernel, model or engine changes, paste the GPU test output and name
-     the GPU, driver, CUDA and torch versions and the build preset. -->
+<!-- CI has no GPU. For kernel, model or engine changes, paste the GPU test output, the output
+     of scripts/check_env.sh and the build preset. -->
 
 ## Checklist
 
