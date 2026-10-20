@@ -3,9 +3,8 @@
 
 ## What and why
 
-<!-- 2-3 sentences: what changed, why, and its effect. -->
-
-Closes #
+<!-- 2-3 sentences: what changed, why, and its effect.
+     Link the issue with "Closes #N" if there is one. -->
 
 ## Interface changes
 
@@ -19,8 +18,8 @@ None
 - [ ] Existing tests already cover the changed logic
 - [ ] No logic changed (docs, comments, config)
 
-<!-- CI has no GPU. For kernel, model or engine changes, paste the GPU test output and name the GPU.
-     Benchmark numbers come from the RTX 3090. -->
+<!-- CI has no GPU. For kernel, model or engine changes, paste the GPU test output and name
+     the GPU, driver, CUDA and torch versions and the build preset. -->
 
 ## Checklist
 
