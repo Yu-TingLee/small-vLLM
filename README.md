@@ -1,15 +1,11 @@
 # small-vLLM
 
-A C++/CUDA LLM inference engine on LibTorch: paged KV cache with prefix caching, continuous batching with preemption, our own FlashAttention-2-style prefill and split-KV decode kernels, and an OpenMP CPU backend. Serves Qwen3-0.6B, plus Llama 3.2 1B for comparison. Final project for Parallel Programming.
-
-**Status:** skeleton. The plan is in [docs/design-spec.md](docs/design-spec.md).
+A C++/CUDA LLM inference engine on LibTorch: paged KV cache with prefix caching, continuous batching with preemption, our own FlashAttention-2-style prefill and split-KV decode kernels, and an OpenMP CPU backend. Serves Qwen3-0.6B, plus Llama 3.2 1B for comparison. The design is in [docs/design-spec.md](docs/design-spec.md).
 
 ## Requirements
 
-- Linux x86_64 with an NVIDIA GPU (sm_86 or sm_89 by default; override with `-DCMAKE_CUDA_ARCHITECTURES=...`), a CUDA toolkit 12.6 or newer (torch 2.14 requires it; `nvcc` on `PATH`, or `CUDACXX` set) and a driver 525 or newer.
-- GCC 11 or newer; set `CXX` if your default `g++` is older. CMake checks the GCC and CUDA versions when it configures.
-- [uv](https://docs.astral.sh/uv/). It installs Python, torch, CMake and Ninja into `.venv`.
-- macOS (or Linux without a GPU) can build and test the CPU-only `cpu` preset.
+- Linux with an NVIDIA GPU, CUDA 12.6+ and GCC 11+
+- [uv](https://docs.astral.sh/uv/)
 
 ## Quickstart
 
@@ -26,20 +22,6 @@ build/release/bin/svllm-bench --device cuda
 scripts/download_models.sh             # Qwen3-0.6B; add --llama for Llama 3.2 1B (gated on Hugging Face)
 ```
 
-## Troubleshooting
-
-- CMake still finds an old compiler or toolkit after you changed `CXX` or `CUDACXX`: it caches them from the first configure. Reconfigure with `uv run cmake --preset release --fresh`.
-- `undefined reference to cupti...@libcupti.so.12` when linking: `LD_LIBRARY_PATH` points at an older CUDA. Remove those entries; torch loads its CUDA libraries from its pip packages.
-
-## Docs
-
-- [docs/design-spec.md](docs/design-spec.md): what we build and how we evaluate it
-- [docs/adr/](docs/adr/): decisions and why
-- [CONTRIBUTING.md](CONTRIBUTING.md): workflow, coding standards, tests
-- [AGENTS.md](AGENTS.md): instructions for AI coding agents
-
 ## License
 
-Apache-2.0. Design ideas and some code come from [tiny-vllm](https://github.com/jmaczan/tiny-vllm); see [NOTICE](NOTICE).
-
-Built with Llama: the tests include Llama 3.2's `config.json`, under the [Llama 3.2 Community License](tests/cpp/data/llama-3.2-1b-instruct/LICENSE.txt).
+Apache-2.0; see [NOTICE](NOTICE).
