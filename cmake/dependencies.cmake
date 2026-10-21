@@ -6,6 +6,13 @@ FetchContent_Declare(json
   URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa)
 FetchContent_MakeAvailable(json)
 
+FetchContent_Declare(
+  tokenizers_cpp
+  GIT_REPOSITORY https://github.com/mlc-ai/tokenizers-cpp.git
+  GIT_TAG main
+)
+FetchContent_MakeAvailable(tokenizers_cpp)
+
 if(SVLLM_BUILD_TESTS)
   FetchContent_Declare(googletest
     URL https://github.com/google/googletest/archive/refs/tags/v1.18.0.tar.gz

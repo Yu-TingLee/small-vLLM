@@ -20,3 +20,6 @@ models/
 .DS_Store
 .vscode/
 .idea/
+
+# Ignore test tokenizers / large json files in test data
+tests/cpp/data/**/tokenizer.json
