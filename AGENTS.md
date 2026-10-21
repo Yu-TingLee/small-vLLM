@@ -35,7 +35,7 @@ cmake/           torch discovery, OpenMP, pinned third-party dependencies
 ## Workflow
 
 - Branch off `main` as `<github-handle>/<topic>`. Every change lands through a PR, squash-merged, so the PR title becomes the commit: Conventional Commits without a scope, e.g. `feat: preemption by recompute`.
-- CI has no GPU. For PRs touching kernels, the model or the engine, run the GPU tests on a GPU machine and paste the output into the PR with the GPU, driver, CUDA and torch versions and the build preset.
+- CI has no GPU. For PRs touching kernels, the model or the engine, run the GPU tests on a GPU machine and paste the output into the PR with that of `scripts/check_env.sh` and the build preset.
 - Record a decision that is hard to reverse in `docs/design-spec.md`, with the reason.
 
 ## Coding standards
