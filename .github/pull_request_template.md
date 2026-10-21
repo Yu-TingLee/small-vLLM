@@ -9,7 +9,7 @@
 ## Interface changes
 
 <!-- Changes to anything another module calls: an ops:: signature, the Model or Engine API.
-     If the change contradicts an ADR in docs/adr/, say which and why. -->
+     If the change contradicts docs/design-spec.md, say where and why. -->
 None
 
 ## Testing
@@ -25,5 +25,5 @@ None
 
 - [ ] I can explain every line of this change
 - [ ] `uv run pre-commit run --all-files` passes
-- [ ] A hard-to-reverse decision is recorded as an ADR in `docs/adr/`, or there is none
+- [ ] A hard-to-reverse decision is recorded in `docs/design-spec.md`, or there is none
 - [ ] No model weights, no files over 1 MB, no AI attribution
