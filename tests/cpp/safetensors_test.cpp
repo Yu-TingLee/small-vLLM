@@ -38,7 +38,7 @@ std::string dtype_name(torch::ScalarType dtype) {
   }
 }
 
-// Pads the header with spaces to 8 bytes, as the reference writer does.
+// Pads the header with spaces to 8 bytes, as the reference writer does
 void write_raw(const std::filesystem::path& path, std::string header, const std::string& data) {
   header.resize((header.size() + 7) / 8 * 8, ' ');
   const uint64_t header_size = header.size();
@@ -92,7 +92,7 @@ class SafetensorsFile : public ::testing::Test {
   void SetUp() override { torch::manual_seed(0); }
   void TearDown() override { std::filesystem::remove(path_); }
 
-  // Returns the error message, checking that it names the file.
+  // Returns the error message, checking that it names the file
   std::string load_error() const {
     try {
       load_safetensors(path_, Device::kCPU);
@@ -118,10 +118,6 @@ class LoadSafetensors : public SafetensorsFile, public ::testing::WithParamInter
       GTEST_SKIP() << "no CUDA device";
     }
   }
-
-  torch::DeviceType device_type() const {
-    return GetParam() == Device::kCUDA ? torch::kCUDA : torch::kCPU;
-  }
 };
 
 TEST_P(LoadSafetensors, RoundTripsBf16) {
@@ -138,7 +134,7 @@ TEST_P(LoadSafetensors, RoundTripsBf16) {
   for (const auto& [name, expected] : written) {
     ASSERT_TRUE(loaded.contains(name)) << name;
     const torch::Tensor& t = loaded.at(name);
-    EXPECT_EQ(t.device().type(), device_type()) << name;
+    EXPECT_EQ(t.device().type(), to_torch_device(GetParam()).type()) << name;
     EXPECT_EQ(t.scalar_type(), torch::kBFloat16) << name;
     EXPECT_EQ(t.sizes(), expected.sizes()) << name;
     EXPECT_TRUE(torch::equal(t.cpu(), expected)) << name;
@@ -156,7 +152,7 @@ TEST_P(LoadSafetensors, ConvertsToBf16) {
   const auto loaded = load_safetensors(path_, GetParam());
   for (const auto& [name, original] : written) {
     const torch::Tensor& t = loaded.at(name);
-    EXPECT_EQ(t.device().type(), device_type()) << name;
+    EXPECT_EQ(t.device().type(), to_torch_device(GetParam()).type()) << name;
     EXPECT_EQ(t.scalar_type(), torch::kBFloat16) << name;
     EXPECT_TRUE(torch::equal(t.cpu(), original.to(torch::kBFloat16))) << name;
   }
@@ -175,7 +171,7 @@ TEST_P(LoadSafetensors, Qwen3MatchesItsHeader) {
     ++num_tensors;
     ASSERT_TRUE(weights.contains(name)) << name;
     const torch::Tensor& t = weights.at(name);
-    EXPECT_EQ(t.device().type(), device_type()) << name;
+    EXPECT_EQ(t.device().type(), to_torch_device(GetParam()).type()) << name;
     EXPECT_EQ(t.scalar_type(), torch::kBFloat16) << name;
     EXPECT_EQ(t.sizes(), info.at("shape").get<std::vector<int64_t>>()) << name;
   }
@@ -199,16 +195,18 @@ INSTANTIATE_TEST_SUITE_P(Devices, LoadSafetensors, ::testing::Values(Device::kCP
                            return info.param == Device::kCUDA ? "CUDA" : "CPU";
                          });
 
-// A zero-copy CPU tensor must keep the mapping alive after the loader returns, and the
-// copy-on-write mapping must keep in-place ops away from the file.
-TEST_F(SafetensorsFile, CpuTensorOutlivesLoaderAndNeverWritesTheFile) {
+// CPU weights are copies, so in-place writes to either the tensor or the file never reach the other
+TEST_F(SafetensorsFile, CpuTensorIsIndependentOfTheFile) {
   const torch::Tensor original = torch::arange(6, torch::kFloat).to(torch::kBFloat16);
+  const torch::Tensor rewritten = torch::zeros({6}, torch::kBFloat16);
   write_safetensors(path_, {{"w", original}});
 
   torch::Tensor w = load_safetensors(path_, Device::kCPU).at("w");
+  write_safetensors(path_, {{"w", rewritten}});
+  EXPECT_TRUE(torch::equal(w, original));
+
   w.add_(1);
-  EXPECT_TRUE(torch::equal(w, original + 1));
-  EXPECT_TRUE(torch::equal(load_safetensors(path_, Device::kCPU).at("w"), original));
+  EXPECT_TRUE(torch::equal(load_safetensors(path_, Device::kCPU).at("w"), rewritten));
 }
 
 TEST_F(SafetensorsFile, RejectsFileShorterThanHeaderLength) {
@@ -227,7 +225,7 @@ TEST_F(SafetensorsFile, RejectsHeaderLengthPastEndOfFile) {
 
 TEST_F(SafetensorsFile, RejectsHeaderThatIsNotJson) {
   write_raw(path_, "not json", "");
-  EXPECT_NE(load_error().find("parse error"), std::string::npos);
+  EXPECT_NE(load_error().find("cannot load"), std::string::npos);
 }
 
 TEST_F(SafetensorsFile, RejectsTruncatedData) {
@@ -254,6 +252,34 @@ TEST_F(SafetensorsFile, RejectsUnsupportedDtype) {
   write_raw(path_, R"({"w": {"dtype": "I8", "shape": [4], "data_offsets": [0, 4]}})",
             std::string(4, '\0'));
   EXPECT_NE(load_error().find("unsupported dtype I8"), std::string::npos);
+}
+
+TEST_F(SafetensorsFile, RejectsMalformedEntries) {
+  const std::vector<std::pair<std::string, std::string>> cases = {
+      {R"([])", "is not a JSON object"},
+      {R"({"w": 5})", "tensor 'w'"},
+      {R"({"w": {"dtype": "BF16", "shape": [-1, 2], "data_offsets": [0, 4]}})",
+       "invalid shape [-1,2]"},
+      {R"({"w": {"dtype": "BF16", "shape": [1.5, 2], "data_offsets": [0, 4]}})",
+       "invalid shape [1.5,2]"},
+      {R"({"w": {"dtype": "BF16", "shape": [4294967296, 4294967296, 4], "data_offsets": [0, 4]}})",
+       "invalid shape [4294967296,4294967296,4]"},
+      {R"({"w": {"dtype": "BF16", "shape": [2], "data_offsets": [0, 4, 8]}})",
+       "data_offsets [0,4,8]"},
+      {R"({"w": {"dtype": "BF16", "shape": [2], "data_offsets": [0, 4]},
+           "w": {"dtype": "BF16", "shape": [2], "data_offsets": [4, 8]}})",
+       "duplicate tensor \"w\""},
+      {R"({"a": {"dtype": "BF16", "shape": [2], "data_offsets": [0, 4]},
+           "b": {"dtype": "BF16", "shape": [3], "data_offsets": [2, 8]}})",
+       "starts at byte 2"},
+      {R"({"w": {"dtype": "BF16", "shape": [2], "data_offsets": [0, 4]}})",
+       "4 bytes after its last tensor"},
+  };
+  for (const auto& [header, fragment] : cases) {
+    SCOPED_TRACE(header);
+    write_raw(path_, header, std::string(8, '\0'));
+    EXPECT_NE(load_error().find(fragment), std::string::npos);
+  }
 }
 
 }  // namespace

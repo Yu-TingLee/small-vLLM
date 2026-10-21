@@ -15,6 +15,10 @@ Device parse_device(std::string_view name) {
   return Device::kCPU;
 }
 
+c10::Device to_torch_device(Device device) {
+  return device == Device::kCUDA ? c10::kCUDA : c10::kCPU;
+}
+
 std::string describe(Device device) {
   if (device == Device::kCPU) {
     return "CPU (" + std::to_string(at::get_num_threads()) + " threads)";
