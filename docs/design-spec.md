@@ -1,6 +1,6 @@
 # small-vLLM design spec
 
-This spec says what we build and how we evaluate it.
+This spec says what we build and how we evaluate it. Which features are in scope, at which tier, is in [ROADMAP.md](ROADMAP.md).
 
 ## Goal and scope
 
@@ -15,30 +15,30 @@ We build **small-vLLM**: a C++/CUDA serving engine with a paged KV cache, contin
 
 [tiny-vllm](https://github.com/jmaczan/tiny-vllm) is the closest project: a single-GPU C++/CUDA engine with paged KV and continuous batching. It is a reference only; we start a fresh codebase and credit any code we adapt in `NOTICE`.
 
-| Component | tiny-vllm | small-vLLM | Priority |
-| --- | --- | --- | --- |
-| Model | Llama 3.2 1B; sizes hardcoded | Qwen3-0.6B; Llama 3.2 1B through `config.json` flags; sizes read from `config.json` | Must |
-| Tensors | Raw CUDA pointers | LibTorch tensors | Must |
-| Tokenizer | Python (Hugging Face) | tokenizers-cpp | Must |
-| Block manager | Paged KV cache | Paged KV cache + prefix caching | Must |
-| Scheduler | Continuous batching; a new prompt's prefill pauses the batch | Continuous batching; preemption by recompute | Must |
-| Prefill attention | Online softmax, FlashAttention-like | FA2-style kernel on paged KV | Must |
-| Decode attention | PagedAttention kernel | Split-KV paged kernel; GQA-aware | Must |
-| GEMM | cuBLAS | `torch::matmul` (cuBLAS on GPU, MKL/oneDNN on CPU) | Must |
-| RMSNorm, RoPE, SiLU | Separate CUDA kernels | Fused CUDA kernels | Should |
-| Sampling | Greedy argmax on CPU | On GPU | Should |
-| CUDA graphs | No | Yes, around our kernels | Should |
+| Component | tiny-vllm | small-vLLM |
+| --- | --- | --- |
+| Model | Llama 3.2 1B; sizes hardcoded | Qwen3-0.6B; Llama 3.2 1B through `config.json` flags; sizes read from `config.json` |
+| Tensors | Raw CUDA pointers | LibTorch tensors |
+| Tokenizer | Python (Hugging Face) | tokenizers-cpp |
+| Block manager | Paged KV cache | Paged KV cache + prefix caching |
+| Scheduler | Continuous batching; each new prompt is prefilled alone while the batch waits | Continuous batching; waiting prompts prefilled together in one step; preemption by recompute |
+| Prefill attention | Online softmax, FlashAttention-like | FA2-style kernel on paged KV |
+| Decode attention | PagedAttention kernel | Split-KV paged kernel; GQA-aware |
+| GEMM | cuBLAS | `torch::matmul` (cuBLAS on GPU, MKL/oneDNN on CPU) |
+| RMSNorm, RoPE, SiLU | Separate CUDA kernels | Fused CUDA kernels |
+| Sampling | Greedy argmax on CPU | On GPU |
+| CUDA graphs | No | Yes, around our kernels |
 
 ### Only in small-vLLM
 
-| Feature | What it is | Priority |
-| --- | --- | --- |
-| Offline benchmark | `svllm-bench`: runs a request set through the engine in-process and writes JSON | Must |
-| Streaming serving | `svllm-serve`: engine loop on its own thread, OpenAI-style HTTP with streamed tokens, one static demo page | Should |
-| CPU backend | The whole model on CPU: an OpenMP kernel for every op; GEMM through `torch::matmul` | Should (bonus) |
-| KV offload to host RAM | Evicted prefix KV is kept in host RAM and copied back on reuse instead of recomputed | Should |
-| Chunked prefill | Long prompts split into chunks and batched with decodes | Stretch |
-| Data-parallel replicas | Two engine copies on the 2× RTX 4090 lab server | Stretch |
+| Feature | What it is |
+| --- | --- |
+| Offline benchmark | `svllm-bench`: runs a request set through the engine in-process and writes JSON |
+| Serving | `svllm-serve`: engine loop on its own thread, OpenAI-style chat HTTP, one static demo page |
+| CPU backend | The whole model on CPU: an OpenMP kernel for every op; GEMM through `torch::matmul` |
+| KV offload to host RAM | Evicted prefix KV is kept in host RAM and copied back on reuse instead of recomputed |
+| Chunked prefill | Long prompts split into chunks and batched with decodes |
+| Data-parallel replicas | Two engine copies on the 2× RTX 4090 lab server |
 
 ## Architecture
 

@@ -1,6 +1,6 @@
 # small-vLLM
 
-C++/CUDA LLM inference engine on LibTorch. What we build: `docs/design-spec.md`. This file is the workflow and coding standards for people and agents alike; follow it.
+C++/CUDA LLM inference engine on LibTorch. What we build and why: `docs/design-spec.md`. Scope, by tier: `docs/ROADMAP.md`. This file is the workflow and coding standards for people and agents alike; follow it.
 
 ## Commands
 
@@ -43,7 +43,7 @@ cmake/           torch discovery, OpenMP, pinned third-party dependencies
 - C++20, everything in namespace `svllm`. Files `snake_case`; types `PascalCase`; functions and variables `snake_case`; private members end in `_`; constants and enumerators `kPascalCase`.
 - `.cu` for kernels, `.cuh` only for device code shared between `.cu` files, `.h`/`.cpp` for everything else.
 - Check inputs with `TORCH_CHECK`; host code may throw.
-- An op is declared in `src/ops/<op>.h`, with kernels in `src/ops/cuda/<op>.cu` and `src/ops/cpu/<op>.cpp`, and dispatches on its input's device. Every op has both kernels and errors on an unsupported device.
+- An op is declared in `src/ops/<op>.h`, with kernels in `src/ops/cuda/<op>.cu` and `src/ops/cpu/<op>.cpp`, and dispatches on its input's device. An op ships both kernels in one PR and errors on an unsupported device. Attention is the exception: its CPU kernels come with the CPU backend, and until then it errors on CPU.
 - Read model sizes from `config.json`. Shapes, paths and GPU architectures come from config or arguments.
 - Write a comment only when the code can't say it on its own.
 - C++ deps: FetchContent in `cmake/dependencies.cmake`, pinned to a release tarball and its SHA256. Python deps: `uv add`, and commit `uv.lock`.
@@ -59,6 +59,7 @@ Test where it pays off:
 
 ## Rules
 
+- Build only what `docs/ROADMAP.md` puts in scope. For a feature it lists as out of scope, or doesn't list, stop and say so; moving it into scope is a PR that edits the roadmap.
 - You must be able to explain every line you submit. Don't add code the task doesn't need.
 - Change only what the task needs. If you change an interface another module calls (an `ops::` signature, the `Model` or `Engine` API), list it under "Interface changes" in the PR description.
 - If your change contradicts `docs/design-spec.md`, say so in the PR instead of silently overriding it.
@@ -73,4 +74,4 @@ Issues live in GitHub Issues for Yu-TingLee/small-vLLM, via the `gh` CLI. See `d
 
 ### Domain docs
 
-Decisions live in `docs/design-spec.md`; no ADRs, no glossary. See `docs/agents/domain.md`.
+Decisions live in `docs/design-spec.md`, scope in `docs/ROADMAP.md`; no ADRs, no glossary. See `docs/agents/domain.md`.
