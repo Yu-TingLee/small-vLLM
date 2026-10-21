@@ -9,14 +9,14 @@
 
 namespace svllm {
 
-Device parse_device(std::string_view name) {
-  if (name == "cuda") return Device::kCUDA;
+c10::Device parse_device(std::string_view name) {
+  if (name == "cuda") return c10::kCUDA;
   TORCH_CHECK(name == "cpu", "unknown device '", name, "'; expected 'cuda' or 'cpu'");
-  return Device::kCPU;
+  return c10::kCPU;
 }
 
-std::string describe(Device device) {
-  if (device == Device::kCPU) {
+std::string describe(c10::Device device) {
+  if (device.is_cpu()) {
     return "CPU (" + std::to_string(at::get_num_threads()) + " threads)";
   }
 #ifdef SVLLM_CUDA
