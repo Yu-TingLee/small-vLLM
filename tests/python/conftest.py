@@ -12,25 +12,17 @@ if not build_dir.is_absolute():
     build_dir = REPO_ROOT / build_dir
 sys.path.insert(0, str(build_dir / "python"))
 
-import svllm_ops  # noqa: E402
-
 BF16_EPS = torch.finfo(torch.bfloat16).eps
 
 
-@pytest.fixture(
-    params=[
-        "cpu",
-        pytest.param(
-            "cuda",
-            marks=pytest.mark.skipif(
-                not (svllm_ops.built_with_cuda and torch.cuda.is_available()),
-                reason="needs a CUDA build of svllm_ops and a GPU",
-            ),
-        ),
-    ]
-)
+@pytest.fixture(params=["cpu", "cuda"])
 def device(request) -> torch.device:
     """Run the test once per device an op has a kernel for (ADR-0002)."""
+    if request.param == "cuda":
+        import svllm_ops
+
+        if not (svllm_ops.built_with_cuda and torch.cuda.is_available()):
+            pytest.skip("needs a CUDA build of svllm_ops and a GPU")
     return torch.device(request.param)
 
 
@@ -39,13 +31,14 @@ def assert_close_bf16(
     expected: torch.Tensor,
     *,
     rtol: float = 2 * BF16_EPS,
-    atol: float = 2 * BF16_EPS,
+    atol: float = 1e-5,
 ) -> None:
     """Assert a bf16 op output matches its PyTorch reference to within two bf16 rounding steps.
 
     Kernels accumulate in fp32 in a different order than PyTorch, which can tip a value to the
-    neighbouring bf16 number before and after a second rounding. Ops whose error grows with the
-    reduction length, such as attention, pass a looser tolerance.
+    neighbouring bf16 number before and after a second rounding. The tolerance is relative, so
+    atol only absorbs values that round to about zero. Ops whose error grows with the reduction
+    length, such as attention, pass a looser tolerance.
     """
     assert actual.dtype == torch.bfloat16, f"expected a bf16 output, got {actual.dtype}"
     torch.testing.assert_close(actual, expected, rtol=rtol, atol=atol)

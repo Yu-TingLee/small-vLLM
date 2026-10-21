@@ -10,12 +10,4 @@ namespace svllm::ops {
 // Returns:    A new bf16 tensor shaped like x, on x's device.
 at::Tensor rms_norm(const at::Tensor& x, const at::Tensor& weight, double eps);
 
-// Per-device kernels; rms_norm validates the inputs and allocates out before calling one
-namespace cpu {
-void rms_norm(const at::Tensor& out, const at::Tensor& x, const at::Tensor& weight, double eps);
-}
-namespace cuda {
-void rms_norm(const at::Tensor& out, const at::Tensor& x, const at::Tensor& weight, double eps);
-}
-
 }  // namespace svllm::ops

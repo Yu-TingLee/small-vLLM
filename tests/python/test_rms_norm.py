@@ -7,6 +7,7 @@ from conftest import assert_close_bf16
 EPS = 1e-6
 
 SHAPES = [
+    (0, 1024),  # an empty batch: no kernel launch
     (1, 128),  # one token, Qwen3 head_dim for QK-norm: fewer vectors than one warp
     (7, 1024),  # Qwen3-0.6B hidden size
     (2, 5, 2048),  # Llama 3.2 1B hidden size, batch and sequence dims flattened into rows
@@ -16,7 +17,12 @@ SHAPES = [
 
 
 def reference(x: torch.Tensor, weight: torch.Tensor, eps: float) -> torch.Tensor:
-    # Normalize in fp32 and round to bf16 before scaling, as Hugging Face's Qwen3 and Llama do
+    """
+    Definition: RMSNorm as Hugging Face's Qwen3 and Llama compute it, built on torch's rms_norm.
+    Formula:    out = bf16(x / sqrt(mean(x^2) + eps)) * weight, normalized in fp32.
+    Domain:     bf16 x [..., hidden] and weight [hidden] on one device; eps > 0.
+    Returns:    A bf16 tensor shaped like x, the expected output of svllm_ops.rms_norm.
+    """
     normed = F.rms_norm(x.float(), (x.shape[-1],), eps=eps).to(torch.bfloat16)
     return normed * weight
 

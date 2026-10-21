@@ -3,6 +3,8 @@
 #include <ATen/ops/empty_like.h>
 #include <c10/util/Exception.h>
 
+#include "ops/rms_norm_kernels.h"
+
 namespace svllm::ops {
 
 at::Tensor rms_norm(const at::Tensor& x, const at::Tensor& weight, double eps) {
@@ -21,11 +23,11 @@ at::Tensor rms_norm(const at::Tensor& x, const at::Tensor& weight, double eps) {
   at::Tensor out = at::empty_like(x);
   switch (x.device().type()) {
     case c10::DeviceType::CPU:
-      cpu::rms_norm(out, x, weight, eps);
+      cpu_impl::rms_norm(out, x, weight, eps);
       break;
 #ifdef SVLLM_CUDA
     case c10::DeviceType::CUDA:
-      cuda::rms_norm(out, x, weight, eps);
+      cuda_impl::rms_norm(out, x, weight, eps);
       break;
 #endif
     default:

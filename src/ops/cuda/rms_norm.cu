@@ -5,10 +5,11 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 
-#include "ops/rms_norm.h"
+#include "ops/rms_norm_kernels.h"
 
-namespace svllm::ops::cuda {
+namespace svllm::ops::cuda_impl {
 namespace {
 
 constexpr int kWarpSize = 32;
@@ -22,7 +23,10 @@ struct alignas(sizeof(__nv_bfloat16) * N) BF16Vec {
   __nv_bfloat16 v[N];
 };
 
-// Returns the sum of value over the block to every thread; blockDim.x must be a multiple of 32
+// Definition: Sum of one float per thread across the whole block.
+// Formula:    total = sum over threadIdx.x of value, by warp shuffles and then one warp.
+// Domain:     blockDim.x a multiple of 32 and at most 1024; called once per kernel.
+// Returns:    The same total to every thread.
 __device__ float block_sum(float value) {
   __shared__ float warp_sums[kMaxThreads / kWarpSize];
   __shared__ float total;
@@ -46,7 +50,10 @@ __device__ float block_sum(float value) {
   return total;
 }
 
-// One block per row; each thread strides over the row N elements at a time
+// Definition: RMSNorm of one row per block, each thread striding N elements at a time.
+// Formula:    out = bf16(x / sqrt(mean(x^2) + eps)) * weight, with the sum accumulated in fp32.
+// Domain:     Rows of hidden bf16 values; with N > 1, hidden % N == 0 and 16-byte aligned rows.
+// Returns:    Nothing; writes row blockIdx.x of out.
 template <int N>
 __global__ void rms_norm_kernel(__nv_bfloat16* __restrict__ out,
                                 const __nv_bfloat16* __restrict__ x,
@@ -89,8 +96,11 @@ bool is_vec_aligned(const void* ptr) {
 }  // namespace
 
 void rms_norm(const at::Tensor& out, const at::Tensor& x, const at::Tensor& weight, double eps) {
+  constexpr int64_t kIntMax = std::numeric_limits<int>::max();
+  const int64_t rows = x.numel() / x.size(-1);
+  TORCH_CHECK(x.size(-1) <= kIntMax && rows <= kIntMax, "rms_norm: ", rows, " rows of ", x.size(-1),
+              " exceed the CUDA kernel's int32 grid and index range");
   const int hidden = static_cast<int>(x.size(-1));
-  const int64_t rows = x.numel() / hidden;
   if (rows == 0) return;
 
   const c10::cuda::CUDAGuard device_guard(x.device());
@@ -106,13 +116,13 @@ void rms_norm(const at::Tensor& out, const at::Tensor& x, const at::Tensor& weig
   const int threads = std::min(kMaxThreads, (vecs_per_row + kWarpSize - 1) / kWarpSize * kWarpSize);
 
   if (vectorized) {
-    rms_norm_kernel<kVecSize>
-        <<<rows, threads, 0, stream>>>(out_ptr, x_ptr, w_ptr, hidden, static_cast<float>(eps));
+    rms_norm_kernel<kVecSize><<<static_cast<unsigned int>(rows), threads, 0, stream>>>(
+        out_ptr, x_ptr, w_ptr, hidden, static_cast<float>(eps));
   } else {
-    rms_norm_kernel<1>
-        <<<rows, threads, 0, stream>>>(out_ptr, x_ptr, w_ptr, hidden, static_cast<float>(eps));
+    rms_norm_kernel<1><<<static_cast<unsigned int>(rows), threads, 0, stream>>>(
+        out_ptr, x_ptr, w_ptr, hidden, static_cast<float>(eps));
   }
   C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 
-}  // namespace svllm::ops::cuda
+}  // namespace svllm::ops::cuda_impl
