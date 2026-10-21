@@ -17,7 +17,7 @@ BF16_EPS = torch.finfo(torch.bfloat16).eps
 
 @pytest.fixture(params=["cpu", "cuda"])
 def device(request) -> torch.device:
-    """Run the test once per device an op has a kernel for (ADR-0002)."""
+    """Run the test once per device an op has a kernel for (docs/design-spec.md)."""
     if request.param == "cuda":
         import svllm_ops
 
