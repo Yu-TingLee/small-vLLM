@@ -63,8 +63,10 @@ else
   nvcc=${CUDACXX:-$(command -v nvcc || echo /usr/local/cuda/bin/nvcc)}
   if [[ ! -x "$nvcc" ]]; then
     report FAIL nvcc "not found; set CUDACXX or add the CUDA toolkit to PATH"
+  elif ! nvcc_version=$("$nvcc" --version 2>/dev/null); then
+    report FAIL nvcc "$nvcc --version failed; is the CUDA toolkit installed correctly?"
   else
-    cuda=$("$nvcc" --version | sed -n 's/.*release \([0-9.]*\),.*/\1/p')
+    cuda=$(sed -n 's/.*release \([0-9.]*\),.*/\1/p' <<<"$nvcc_version")
     if version_ge "$cuda" "$MIN_CUDA"; then
       report PASS nvcc "$cuda ($nvcc)"
     else
