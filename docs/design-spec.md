@@ -38,7 +38,7 @@ We build **small-vLLM**: a C++/CUDA serving engine with a paged KV cache, contin
 | CPU backend | The whole model on CPU: an OpenMP kernel for every op; GEMM through `torch::matmul` | Should (bonus) |
 | KV offload to host RAM | Evicted prefix KV is kept in host RAM and copied back on reuse instead of recomputed | Should |
 | Chunked prefill | Long prompts split into chunks and batched with decodes | Stretch |
-| Data-parallel replicas | Two engine copies on the 2× RTX 4090 lab server | Stretch |
+| Data-parallel replicas | Two engine copies, one per GPU | Stretch |
 
 ## Architecture
 
@@ -52,12 +52,7 @@ C++20 and CUDA throughout, on the LibTorch bundled with the pinned pip `torch`.
 
 ## Hardware
 
-| Machine | GPU | Use |
-| --- | --- | --- |
-| Benchmark machine | 1× RTX 3090 (sm_86), always available | Every number in the report, except DP replicas |
-| Lab server (shared, when free) | 2× RTX 4090 (sm_89) | Development; data-parallel replicas |
-
-We build for sm_86 and sm_89 with a CUDA 12.6+ toolkit, matching the pinned torch wheel (cu126); any driver from 525 runs it. Laptops are for editing and the CPU-only build; GPU work runs over SSH, and the demo page is reached through an SSH port forward.
+We target the RTX 3090 (sm_86) and RTX 4090 (sm_89), with a CUDA 12.6+ toolkit to match the pinned torch wheel (cu126); any driver from 525 runs it.
 
 ## Related work
 
@@ -82,7 +77,7 @@ We build for sm_86 and sm_89 with a CUDA 12.6+ toolkit, matching the pinned torc
 
 ## Evaluation plan
 
-Ours against a baseline on the benchmark machine.
+Ours against a baseline on the same GPU.
 
 | Experiment | Metric | Baseline |
 | --- | --- | --- |
@@ -93,7 +88,7 @@ Ours against a baseline on the benchmark machine.
 | Latency | TTFT, TPOT | Static batching |
 | CPU backend | Speedup vs threads | 1 thread; llama.cpp (same precision) |
 | KV offload | Hit rate; TTFT on multi-turn chat | GPU-only prefix cache |
-| DP replicas (stretch) | Tokens/s, 1 vs 2 replicas, on the lab server | 1 replica |
+| DP replicas (stretch) | Tokens/s, 1 vs 2 replicas | 1 replica |
 
 - **Decode / prefill:** decode is limited by memory bandwidth, so we report GB/s. Prefill is limited by compute, so we report TFLOP/s.
 - **GQA group:** how many query heads share one KV head (2 on Qwen3-0.6B, 4 on Llama 3.2 1B).
