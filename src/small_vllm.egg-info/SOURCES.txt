@@ -1,9 +1,0 @@
-LICENSE
-NOTICE
-README.md
-pyproject.toml
-src/small_vllm.egg-info/PKG-INFO
-src/small_vllm.egg-info/SOURCES.txt
-src/small_vllm.egg-info/dependency_links.txt
-src/small_vllm.egg-info/requires.txt
-src/small_vllm.egg-info/top_level.txt
