@@ -26,6 +26,12 @@ def device(request) -> torch.device:
     return torch.device(request.param)
 
 
+def random_bf16(*shape: int, device: torch.device, seed: int = 0) -> torch.Tensor:
+    """Return seeded standard-normal bf16 values, identical on every device for a given seed."""
+    generator = torch.Generator().manual_seed(seed)
+    return torch.randn(shape, generator=generator).to(device=device, dtype=torch.bfloat16)
+
+
 def assert_close_bf16(
     actual: torch.Tensor,
     expected: torch.Tensor,

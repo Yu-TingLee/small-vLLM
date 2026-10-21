@@ -2,7 +2,7 @@ import pytest
 import svllm_ops
 import torch
 import torch.nn.functional as F
-from conftest import assert_close_bf16
+from conftest import assert_close_bf16, random_bf16
 
 EPS = 1e-6
 
@@ -25,11 +25,6 @@ def reference(x: torch.Tensor, weight: torch.Tensor, eps: float) -> torch.Tensor
     """
     normed = F.rms_norm(x.float(), (x.shape[-1],), eps=eps).to(torch.bfloat16)
     return normed * weight
-
-
-def random_bf16(*shape: int, device: torch.device, seed: int = 0) -> torch.Tensor:
-    generator = torch.Generator().manual_seed(seed)
-    return torch.randn(shape, generator=generator).to(device=device, dtype=torch.bfloat16)
 
 
 @pytest.mark.parametrize("shape", SHAPES, ids=str)

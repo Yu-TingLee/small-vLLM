@@ -1,6 +1,5 @@
 #include "ops/rms_norm.h"
 
-#include <ATen/ops/empty_like.h>
 #include <c10/util/Exception.h>
 
 #include "ops/rms_norm_kernels.h"
@@ -20,7 +19,7 @@ at::Tensor rms_norm(const at::Tensor& x, const at::Tensor& weight, double eps) {
   TORCH_CHECK(x.device() == weight.device(), "rms_norm: x is on ", x.device(), " but weight is on ",
               weight.device());
 
-  at::Tensor out = at::empty_like(x);
+  at::Tensor out = x.new_empty(x.sizes());
   switch (x.device().type()) {
     case c10::DeviceType::CPU:
       cpu_impl::rms_norm(out, x, weight, eps);
