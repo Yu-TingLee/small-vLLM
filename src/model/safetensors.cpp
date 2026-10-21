@@ -1,6 +1,7 @@
 #include "model/safetensors.h"
 
 #include <c10/util/Exception.h>
+#include <c10/util/accumulate.h>
 #include <c10/util/safe_numerics.h>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -68,8 +69,23 @@ std::optional<torch::ScalarType> parse_dtype(const std::string& name) {
   return std::nullopt;
 }
 
+std::optional<std::vector<int64_t>> parse_shape(const nlohmann::json& j) {
+  if (!j.is_array() || !std::all_of(j.begin(), j.end(), [](const nlohmann::json& d) {
+        return d.is_number_integer();
+      })) {
+    return std::nullopt;
+  }
+  auto shape = j.get<std::vector<int64_t>>();
+  uint64_t numel = 0;
+  if (!std::ranges::all_of(shape, [](int64_t d) { return d >= 0; }) ||
+      c10::safe_multiplies_u64(shape, &numel)) {
+    return std::nullopt;
+  }
+  return shape;
+}
+
 std::unordered_map<std::string, torch::Tensor> parse_safetensors(const std::filesystem::path& path,
-                                                                 Device device) {
+                                                                 c10::Device device) {
   const MappedFile file(path);
 
   uint64_t header_size = 0;
@@ -109,16 +125,9 @@ std::unordered_map<std::string, torch::Tensor> parse_safetensors(const std::file
     TORCH_CHECK(dtype, where, " has unsupported dtype ", dtype_name,
                 "; expected BF16, F16, F32 or F64");
 
-    const nlohmann::json& shape_json = info.at("shape");
-    TORCH_CHECK(shape_json.is_array() &&
-                    std::all_of(shape_json.begin(), shape_json.end(),
-                                [](const nlohmann::json& d) { return d.is_number_integer(); }),
-                where, " has invalid shape ", shape_json.dump());
-    const auto shape = shape_json.get<std::vector<int64_t>>();
-    uint64_t numel = 0;
-    TORCH_CHECK(std::ranges::all_of(shape, [](int64_t d) { return d >= 0; }) &&
-                    !c10::safe_multiplies_u64(shape, &numel),
-                where, " has invalid shape ", shape_json.dump());
+    const std::optional<std::vector<int64_t>> shape = parse_shape(info.at("shape"));
+    TORCH_CHECK(shape, where, " has invalid shape ", info.at("shape").dump());
+    const auto numel = static_cast<uint64_t>(c10::multiply_integers(*shape));
 
     const nlohmann::json& offsets_json = info.at("data_offsets");
     TORCH_CHECK(offsets_json.is_array() && offsets_json.size() == 2 &&
@@ -133,7 +142,7 @@ std::unordered_map<std::string, torch::Tensor> parse_safetensors(const std::file
                 where, " has data_offsets spanning ", end - begin,
                 " bytes, but its shape and dtype need ", nbytes);
 
-    entries.push_back({name, *dtype, shape, begin, end});
+    entries.push_back({name, *dtype, *shape, begin, end});
   }
 
   // The format requires the tensors to tile the data buffer with no gaps or overlaps
@@ -147,14 +156,13 @@ std::unordered_map<std::string, torch::Tensor> parse_safetensors(const std::file
   TORCH_CHECK(covered == data_size, path.string(), " has ", data_size - covered,
               " bytes after its last tensor");
 
-  const c10::Device target = to_torch_device(device);
   std::unordered_map<std::string, torch::Tensor> tensors;
   for (const TensorEntry& e : entries) {
-    // Copy even when the dtype and device match, so the weights never track later edits to the
-    // file and get aligned storage, from_blob needs a mutable pointer but the copy only reads it.
+    // Copy even a bf16 tensor bound for the CPU, since the mapping is unmapped on return, from_blob
+    // needs a mutable pointer but the copy only reads it.
     const torch::Tensor view = torch::from_blob(const_cast<std::byte*>(data + e.begin), e.shape,
                                                 torch::TensorOptions().dtype(e.dtype));
-    tensors.emplace(e.name, view.to(target, torch::kBFloat16, /*non_blocking=*/false,
+    tensors.emplace(e.name, view.to(device, torch::kBFloat16, /*non_blocking=*/false,
                                     /*copy=*/true));
   }
   return tensors;
@@ -163,7 +171,7 @@ std::unordered_map<std::string, torch::Tensor> parse_safetensors(const std::file
 }  // namespace
 
 std::unordered_map<std::string, torch::Tensor> load_safetensors(const std::filesystem::path& path,
-                                                                Device device) {
+                                                                c10::Device device) {
   try {
     return parse_safetensors(path, device);
   } catch (const c10::Error&) {
