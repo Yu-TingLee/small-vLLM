@@ -32,6 +32,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --extra cpu --locked
+      - run: uv run python scripts/download_tokenizers.py
       - run: uv run cmake --preset cpu
       - run: uv run cmake --build --preset cpu
       - run: uv run ctest --preset cpu
