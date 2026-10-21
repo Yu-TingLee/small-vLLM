@@ -30,9 +30,7 @@ for model_name, (url, out_path) in tokenizers.items():
 
         # Detect a Git LFS pointer instead of the actual JSON file.
         if content.startswith(b"version https://git-lfs.github.com/spec/v1"):
-            raise ValueError(
-                "Server returned a Git LFS pointer, not the actual tokenizer JSON."
-            )
+            raise ValueError("Server returned a Git LFS pointer, not the actual tokenizer JSON.")
 
         # Verify the downloaded content is valid JSON.
         data = json.loads(content)

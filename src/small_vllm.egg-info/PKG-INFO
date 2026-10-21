@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: small-vllm
+Version: 0.1.0
+Summary: Tests, benchmarks and tooling for the small-vLLM C++/CUDA inference engine
+Requires-Python: <3.14,>=3.11
+License-File: LICENSE
+License-File: NOTICE
+Provides-Extra: cpu
+Requires-Dist: torch==2.14.1; extra == "cpu"
+Provides-Extra: cu126
+Requires-Dist: torch==2.14.1; extra == "cu126"
+Dynamic: license-file
