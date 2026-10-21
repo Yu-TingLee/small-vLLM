@@ -13,3 +13,6 @@ add_executable(svllm_tokenizer_test tokenizer_test.cpp)
 target_link_libraries(svllm_tokenizer_test PRIVATE svllm torch torch_cpu)
 target_include_directories(svllm_tokenizer_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../src/tokenizer ${CMAKE_BINARY_DIR}/_deps/tokenizers_cpp-src/include)
 add_test(NAME TokenizerTest COMMAND svllm_tokenizer_test)
+set_tests_properties(TokenizerTest PROPERTIES
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
