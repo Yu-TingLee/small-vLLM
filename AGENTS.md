@@ -25,7 +25,7 @@ src/engine/      Device, block manager, prefix cache, scheduler, KV offload, eng
 src/tokenizer/   tokenizers-cpp wrapper
 src/apps/        svllm-bench and svllm-serve entry points
 bindings/        pybind11 module svllm_ops, for tests and benchmarks only
-tests/cpp/       googletest: engine logic, CPU only
+tests/cpp/       googletest: engine and model logic; CUDA cases skip without a GPU
 tests/python/    pytest: ops vs PyTorch, end to end vs Hugging Face
 bench/           kernel and throughput benchmarks, plotting
 scripts/         model download, environment checks
