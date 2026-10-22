@@ -1,6 +1,7 @@
 add_library(svllm STATIC
   engine/device.cpp
   model/config.cpp
+  model/safetensors.cpp
 )
 target_include_directories(svllm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(svllm PUBLIC
