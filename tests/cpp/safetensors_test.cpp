@@ -119,7 +119,7 @@ TEST_P(LoadSafetensors, RoundTripsToBf16) {
   for (const auto& [name, original] : written) {
     ASSERT_TRUE(loaded.contains(name)) << name;
     const torch::Tensor& t = loaded.at(name);
-    EXPECT_EQ(t.device().type(), device().type()) << name;
+    EXPECT_EQ(t.device(), device()) << name;
     EXPECT_EQ(t.scalar_type(), torch::kBFloat16) << name;
     EXPECT_EQ(t.sizes(), original.sizes()) << name;
     EXPECT_TRUE(torch::equal(t.cpu(), original)) << name;
@@ -139,7 +139,7 @@ TEST_P(LoadSafetensors, Qwen3MatchesItsHeader) {
     ++num_tensors;
     ASSERT_TRUE(weights.contains(name)) << name;
     const torch::Tensor& t = weights.at(name);
-    EXPECT_EQ(t.device().type(), device().type()) << name;
+    EXPECT_EQ(t.device(), device()) << name;
     EXPECT_EQ(t.scalar_type(), torch::kBFloat16) << name;
     EXPECT_EQ(t.sizes(), info.at("shape").get<std::vector<int64_t>>()) << name;
   }
@@ -159,7 +159,7 @@ TEST_P(LoadSafetensors, Qwen3MatchesItsHeader) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Devices, LoadSafetensors,
-                         ::testing::Values(c10::Device(c10::kCPU), c10::Device(c10::kCUDA)),
+                         ::testing::Values(c10::Device(c10::kCPU), c10::Device(c10::kCUDA, 0)),
                          [](const auto& info) { return info.param.is_cuda() ? "CUDA" : "CPU"; });
 
 // CPU weights are copies, so in-place writes to either the tensor or the file never reach the other
