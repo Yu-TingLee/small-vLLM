@@ -8,8 +8,10 @@ repos:
       - id: check-json
       - id: check-toml
       - id: check-merge-conflict
+
+      # CI runs with --all-files, where nothing is staged, so check every file
       - id: check-added-large-files
-        args: [--maxkb=1024]
+        args: [--maxkb=1024, --enforce-all]
   - repo: https://github.com/pre-commit/mirrors-clang-format
     rev: v23.1.2
     hooks:
