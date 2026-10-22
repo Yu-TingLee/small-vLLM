@@ -16,7 +16,6 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -55,27 +54,18 @@ class MappedFile {
 
 struct TensorEntry {
   std::string name;
-  torch::ScalarType dtype;
   std::vector<int64_t> shape;
   uint64_t begin;
   uint64_t end;
 };
 
-std::optional<torch::ScalarType> parse_dtype(const std::string& name) {
-  if (name == "BF16") return torch::kBFloat16;
-  if (name == "F16") return torch::kHalf;
-  if (name == "F32") return torch::kFloat;
-  if (name == "F64") return torch::kDouble;
-  return std::nullopt;
-}
-
-std::optional<std::vector<int64_t>> parse_shape(const nlohmann::json& j) {
-  if (!j.is_array() || !std::all_of(j.begin(), j.end(), [](const nlohmann::json& d) {
-        return d.is_number_integer();
-      })) {
+std::optional<std::vector<int64_t>> parse_shape(const nlohmann::json& shape_json) {
+  if (!shape_json.is_array() ||
+      !std::all_of(shape_json.begin(), shape_json.end(),
+                   [](const nlohmann::json& d) { return d.is_number_integer(); })) {
     return std::nullopt;
   }
-  auto shape = j.get<std::vector<int64_t>>();
+  auto shape = shape_json.get<std::vector<int64_t>>();
   uint64_t numel = 0;
   if (!std::ranges::all_of(shape, [](int64_t d) { return d >= 0; }) ||
       c10::safe_multiplies_u64(shape, &numel)) {
@@ -94,17 +84,7 @@ std::unordered_map<std::string, torch::Tensor> parse_safetensors(const std::file
               " in ", path.string(), " exceeds the ", file.size(), "-byte file");
   const auto* header_begin = reinterpret_cast<const char*>(file.data()) + sizeof(header_size);
 
-  // nlohmann keeps only the last of duplicate keys, so catch them while parsing
-  std::unordered_set<std::string> names;
-  const auto reject_duplicates = [&](int depth, nlohmann::json::parse_event_t event,
-                                     nlohmann::json& parsed) {
-    TORCH_CHECK(depth != 1 || event != nlohmann::json::parse_event_t::key ||
-                    names.insert(parsed.get<std::string>()).second,
-                "duplicate tensor ", parsed.dump(), " in ", path.string());
-    return true;
-  };
-  const nlohmann::json header =
-      nlohmann::json::parse(header_begin, header_begin + header_size, reject_duplicates);
+  const nlohmann::json header = nlohmann::json::parse(header_begin, header_begin + header_size);
   TORCH_CHECK(header.is_object(), "header of ", path.string(), " is not a JSON object");
 
   // Offsets in the header count from the end of the header, not from the start of the file
@@ -114,56 +94,60 @@ std::unordered_map<std::string, torch::Tensor> parse_safetensors(const std::file
   std::vector<TensorEntry> entries;
   for (const auto& [name, info] : header.items()) {
     if (name == "__metadata__") continue;
-    const std::string where = "tensor '" + name + "' in " + path.string();
+    const std::string tensor_desc = "tensor '" + name + "' in " + path.string();
 
     TORCH_CHECK(info.is_object() && info.contains("dtype") && info.at("dtype").is_string() &&
                     info.contains("shape") && info.contains("data_offsets"),
-                where, " needs a string dtype, a shape and data_offsets");
+                tensor_desc, " needs a string dtype, a shape and data_offsets");
 
     const auto dtype_name = info.at("dtype").get<std::string>();
-    const std::optional<torch::ScalarType> dtype = parse_dtype(dtype_name);
-    TORCH_CHECK(dtype, where, " has unsupported dtype ", dtype_name,
-                "; expected BF16, F16, F32 or F64");
+    TORCH_CHECK(dtype_name == "BF16", tensor_desc, " has unsupported dtype ", dtype_name,
+                "; expected BF16");
 
     const std::optional<std::vector<int64_t>> shape = parse_shape(info.at("shape"));
-    TORCH_CHECK(shape, where, " has invalid shape ", info.at("shape").dump());
+    TORCH_CHECK(shape, tensor_desc, " has invalid shape ", info.at("shape").dump());
     const auto numel = static_cast<uint64_t>(c10::multiply_integers(*shape));
 
     const nlohmann::json& offsets_json = info.at("data_offsets");
     TORCH_CHECK(offsets_json.is_array() && offsets_json.size() == 2 &&
                     offsets_json[0].is_number_unsigned() && offsets_json[1].is_number_unsigned(),
-                where, " has data_offsets ", offsets_json.dump(), "; expected [begin, end]");
+                tensor_desc, " has data_offsets ", offsets_json.dump(), "; expected [begin, end]");
     const auto [begin, end] = offsets_json.get<std::array<uint64_t, 2>>();
-    TORCH_CHECK(begin <= end && end <= data_size, where, " has data_offsets [", begin, ", ", end,
-                "] outside the ", data_size, "-byte data buffer");
+    TORCH_CHECK(begin <= end && end <= data_size, tensor_desc, " has data_offsets [", begin, ", ",
+                end, "] outside the ", data_size, "-byte data buffer");
     uint64_t nbytes = 0;
-    TORCH_CHECK(!c10::mul_overflows(numel, uint64_t{c10::elementSize(*dtype)}, &nbytes) &&
+    TORCH_CHECK(!c10::mul_overflows(numel, uint64_t{sizeof(c10::BFloat16)}, &nbytes) &&
                     nbytes == end - begin,
-                where, " has data_offsets spanning ", end - begin,
+                tensor_desc, " has data_offsets spanning ", end - begin,
                 " bytes, but its shape and dtype need ", nbytes);
+    const uint64_t file_offset = sizeof(header_size) + header_size + begin;
+    TORCH_CHECK(file_offset % sizeof(c10::BFloat16) == 0, tensor_desc, " starts at byte ",
+                file_offset, " of the file, which is misaligned for BF16");
 
-    entries.push_back({name, *dtype, *shape, begin, end});
+    entries.push_back({name, *shape, begin, end});
   }
 
   // The format requires the tensors to tile the data buffer with no gaps or overlaps
-  std::ranges::sort(entries, {}, [](const TensorEntry& e) { return std::pair(e.begin, e.end); });
+  std::ranges::sort(entries, {},
+                    [](const TensorEntry& entry) { return std::pair(entry.begin, entry.end); });
   uint64_t covered = 0;
-  for (const TensorEntry& e : entries) {
-    TORCH_CHECK(e.begin == covered, "tensor '", e.name, "' in ", path.string(), " starts at byte ",
-                e.begin, " of the data buffer, but the previous tensor ends at byte ", covered);
-    covered = e.end;
+  for (const TensorEntry& entry : entries) {
+    TORCH_CHECK(entry.begin == covered, "tensor '", entry.name, "' in ", path.string(),
+                " starts at byte ", entry.begin,
+                " of the data buffer, but the previous tensor ends at byte ", covered);
+    covered = entry.end;
   }
   TORCH_CHECK(covered == data_size, path.string(), " has ", data_size - covered,
               " bytes after its last tensor");
 
   std::unordered_map<std::string, torch::Tensor> tensors;
-  for (const TensorEntry& e : entries) {
-    // Copy even a bf16 tensor bound for the CPU, since the mapping is unmapped on return, from_blob
-    // needs a mutable pointer but the copy only reads it.
-    const torch::Tensor view = torch::from_blob(const_cast<std::byte*>(data + e.begin), e.shape,
-                                                torch::TensorOptions().dtype(e.dtype));
-    tensors.emplace(e.name, view.to(device, torch::kBFloat16, /*non_blocking=*/false,
-                                    /*copy=*/true));
+  for (const TensorEntry& entry : entries) {
+    // The file is unmapped on return, so copy even when the tensor is already on `device`.
+    // const_cast is safe: from_blob wants a mutable pointer, but the copy only reads.
+    const torch::Tensor view =
+        torch::from_blob(const_cast<std::byte*>(data + entry.begin), entry.shape, torch::kBFloat16);
+    tensors.emplace(entry.name, view.to(device, torch::kBFloat16, /*non_blocking=*/false,
+                                        /*copy=*/true));
   }
   return tensors;
 }

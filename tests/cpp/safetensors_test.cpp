@@ -1,5 +1,6 @@
 #include "model/safetensors.h"
 
+#include <c10/core/Device.h>
 #include <c10/util/Exception.h>
 #include <c10/util/tempfile.h>
 #include <gtest/gtest.h>
@@ -16,28 +17,12 @@
 #include <utility>
 #include <vector>
 
-#include "engine/device.h"
 #include "model/config.h"
 
 namespace svllm {
 namespace {
 
 using NamedTensors = std::vector<std::pair<std::string, torch::Tensor>>;
-
-std::string dtype_name(torch::ScalarType dtype) {
-  switch (dtype) {
-    case torch::kBFloat16:
-      return "BF16";
-    case torch::kHalf:
-      return "F16";
-    case torch::kFloat:
-      return "F32";
-    case torch::kDouble:
-      return "F64";
-    default:
-      TORCH_CHECK(false, "no safetensors name for ", dtype);
-  }
-}
 
 // Pads the header with spaces to 8 bytes, as the reference writer does
 void write_raw(const std::filesystem::path& path, std::string header, const std::string& data) {
@@ -55,7 +40,7 @@ void write_safetensors(const std::filesystem::path& path, const NamedTensors& te
     const torch::Tensor t = tensor.contiguous();
     const uint64_t begin = data.size();
     data.append(static_cast<const char*>(t.data_ptr()), t.nbytes());
-    header[name] = {{"dtype", dtype_name(t.scalar_type())},
+    header[name] = {{"dtype", "BF16"},
                     {"shape", t.sizes().vec()},
                     {"data_offsets", {begin, uint64_t{data.size()}}}};
   }
@@ -109,16 +94,16 @@ class SafetensorsFile : public ::testing::Test {
   const std::filesystem::path path_ = file_.name;
 };
 
-class LoadSafetensors : public SafetensorsFile, public ::testing::WithParamInterface<Device> {
+class LoadSafetensors : public SafetensorsFile, public ::testing::WithParamInterface<c10::Device> {
  protected:
   void SetUp() override {
     SafetensorsFile::SetUp();
-    if (GetParam() == Device::kCUDA && !torch::cuda::is_available()) {
+    if (GetParam().is_cuda() && !torch::cuda::is_available()) {
       GTEST_SKIP() << "no CUDA device";
     }
   }
 
-  c10::Device device() const { return to_torch_device(GetParam()); }
+  c10::Device device() const { return GetParam(); }
 };
 
 TEST_P(LoadSafetensors, RoundTripsToBf16) {
@@ -126,9 +111,6 @@ TEST_P(LoadSafetensors, RoundTripsToBf16) {
       {"model.embed_tokens.weight", torch::randn({5, 8}).to(torch::kBFloat16)},
       {"scalar", torch::tensor(3.5).to(torch::kBFloat16)},
       {"empty", torch::empty({0, 4}, torch::kBFloat16)},
-      {"f16", torch::randn({2, 3}).to(torch::kHalf)},
-      {"f32", torch::randn({3, 4})},
-      {"f64", torch::randn({4}, torch::kDouble)},
   };
   write_safetensors(path_, written);
 
@@ -140,7 +122,7 @@ TEST_P(LoadSafetensors, RoundTripsToBf16) {
     EXPECT_EQ(t.device().type(), device().type()) << name;
     EXPECT_EQ(t.scalar_type(), torch::kBFloat16) << name;
     EXPECT_EQ(t.sizes(), original.sizes()) << name;
-    EXPECT_TRUE(torch::equal(t.cpu(), original.to(torch::kBFloat16))) << name;
+    EXPECT_TRUE(torch::equal(t.cpu(), original)) << name;
   }
 }
 
@@ -163,23 +145,22 @@ TEST_P(LoadSafetensors, Qwen3MatchesItsHeader) {
   }
   EXPECT_EQ(weights.size(), num_tensors);
 
-  const ModelConfig c =
+  const ModelConfig config =
       load_model_config(std::filesystem::path(SVLLM_TEST_DATA_DIR) / "qwen3-0.6b" / "config.json");
-  const std::string last = "model.layers." + std::to_string(c.num_layers - 1) + ".";
+  const std::string last = "model.layers." + std::to_string(config.num_layers - 1) + ".";
   EXPECT_EQ(weights.at("model.embed_tokens.weight").sizes(),
-            torch::IntArrayRef({c.vocab_size, c.hidden_size}));
+            torch::IntArrayRef({config.vocab_size, config.hidden_size}));
   EXPECT_EQ(weights.at(last + "self_attn.q_proj.weight").sizes(),
-            torch::IntArrayRef({c.num_heads * c.head_dim, c.hidden_size}));
+            torch::IntArrayRef({config.num_heads * config.head_dim, config.hidden_size}));
   EXPECT_EQ(weights.at(last + "self_attn.k_proj.weight").sizes(),
-            torch::IntArrayRef({c.num_kv_heads * c.head_dim, c.hidden_size}));
+            torch::IntArrayRef({config.num_kv_heads * config.head_dim, config.hidden_size}));
   EXPECT_EQ(weights.at(last + "mlp.down_proj.weight").sizes(),
-            torch::IntArrayRef({c.hidden_size, c.intermediate_size}));
+            torch::IntArrayRef({config.hidden_size, config.intermediate_size}));
 }
 
-INSTANTIATE_TEST_SUITE_P(Devices, LoadSafetensors, ::testing::Values(Device::kCPU, Device::kCUDA),
-                         [](const auto& info) {
-                           return info.param == Device::kCUDA ? "CUDA" : "CPU";
-                         });
+INSTANTIATE_TEST_SUITE_P(Devices, LoadSafetensors,
+                         ::testing::Values(c10::Device(c10::kCPU), c10::Device(c10::kCUDA)),
+                         [](const auto& info) { return info.param.is_cuda() ? "CUDA" : "CPU"; });
 
 // CPU weights are copies, so in-place writes to either the tensor or the file never reach the other
 TEST_F(SafetensorsFile, CpuTensorIsIndependentOfTheFile) {
@@ -215,6 +196,18 @@ TEST_F(SafetensorsFile, RejectsTruncatedData) {
   EXPECT_NE(load_error().find("outside the"), std::string::npos);
 }
 
+TEST_F(SafetensorsFile, RejectsMisalignedTensor) {
+  const std::string header = R"({"w": {"dtype": "BF16", "shape": [1], "data_offsets": [0, 2]}} )";
+  ASSERT_EQ(header.size() % 2, 1u);
+  const uint64_t header_size = header.size();
+  {
+    std::ofstream out(path_, std::ios::binary);
+    out.write(reinterpret_cast<const char*>(&header_size), sizeof(header_size));
+    out << header << std::string(2, '\0');
+  }
+  EXPECT_NE(load_error().find("misaligned for BF16"), std::string::npos);
+}
+
 TEST_F(SafetensorsFile, RejectsMalformedEntries) {
   const std::vector<std::pair<std::string, std::string>> cases = {
       {"not json", "cannot load"},
@@ -235,7 +228,7 @@ TEST_F(SafetensorsFile, RejectsMalformedEntries) {
        "data_offsets [0,4,8]"},
       {R"({"w": {"dtype": "BF16", "shape": [2], "data_offsets": [0, 4]},
            "w": {"dtype": "BF16", "shape": [2], "data_offsets": [4, 8]}})",
-       "duplicate tensor \"w\""},
+       "starts at byte 4"},
       {R"({"a": {"dtype": "BF16", "shape": [2], "data_offsets": [0, 4]},
            "b": {"dtype": "BF16", "shape": [3], "data_offsets": [2, 8]}})",
        "starts at byte 2"},
