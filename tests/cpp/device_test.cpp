@@ -7,7 +7,7 @@ namespace svllm {
 namespace {
 
 TEST(ParseDevice, AcceptsCudaAndCpu) {
-  EXPECT_EQ(parse_device("cuda"), c10::Device(c10::kCUDA));
+  EXPECT_EQ(parse_device("cuda"), c10::Device(c10::kCUDA, 0));
   EXPECT_EQ(parse_device("cpu"), c10::Device(c10::kCPU));
 }
 
