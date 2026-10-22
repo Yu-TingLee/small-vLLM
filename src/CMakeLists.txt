@@ -3,6 +3,15 @@ add_library(svllm STATIC
   model/config.cpp
   model/safetensors.cpp
 )
+target_sources(svllm PRIVATE
+  ops/rms_norm.cpp
+  ops/cpu/rms_norm.cpp
+)
+if(SVLLM_CUDA)
+  target_sources(svllm PRIVATE
+    ops/cuda/rms_norm.cu
+  )
+endif()
 target_include_directories(svllm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(svllm PUBLIC
   SVLLM_VERSION="${PROJECT_VERSION}"
