@@ -51,8 +51,6 @@ cmake/           torch discovery, OpenMP, pinned third-party dependencies
 
 ### Names
 
-Engine and kernel code uses vLLM's names, so it reads like vLLM and the papers:
-
 | Name | Meaning |
 | --- | --- |
 | `Request` | One prompt and its generated tokens, from `add_request` until it finishes |
