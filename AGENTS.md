@@ -59,7 +59,7 @@ Test where it pays off:
 
 ## Rules
 
-- Build only what `docs/ROADMAP.md` puts in scope. For a feature it lists as out of scope, or doesn't list, stop and say so; moving it into scope is a PR that edits the roadmap.
+- Build only what `docs/ROADMAP.md` puts in scope. For a feature it lists as out of scope, or doesn't list, stop and say so; moving it into scope is a PR that edits the roadmap. Bug fixes, refactors, and doc or tooling changes with their own issue need no row.
 - You must be able to explain every line you submit. Don't add code the task doesn't need.
 - Change only what the task needs. If you change an interface another module calls (an `ops::` signature, the `Model` or `Engine` API), list it under "Interface changes" in the PR description.
 - If your change contradicts `docs/design-spec.md`, say so in the PR instead of silently overriding it.

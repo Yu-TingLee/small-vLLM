@@ -1,8 +1,8 @@
 # small-vLLM roadmap
 
-What is in scope, at which tier, and what is out. Find a feature here before building it. If it is out of scope or not listed, stop and say so; moving a feature into scope takes a PR that edits this file. Each feature's issue holds its "done when"; `docs/design-spec.md` holds the architecture.
+What is in scope, at which tier, and what is out. Find a feature here before building it; a row's Scope is the whole of that row, and anything beyond it counts as not listed. If a feature is out of scope or not listed, stop and say so; moving a feature into scope takes a PR that edits this file. Each feature's issue holds its "done when"; `docs/design-spec.md` holds the architecture.
 
-- **Must:** the engine and every number in the report.
+- **Must:** the engine and the benchmark harness behind the report.
 - **Should:** the demo, the CPU backend and the optimizations we plan to measure.
 - **Stretch:** only once Must and Should are done.
 
@@ -13,9 +13,9 @@ These hold for every feature.
 - **Models:** Qwen3-0.6B and Llama 3.2 1B Instruct. Sizes and flags come from `config.json`, EOS ids from `generation_config.json`.
 - **Precision:** bf16 weights, activations and KV cache, on both devices. Kernels accumulate in fp32. Ops reject other dtypes with `TORCH_CHECK`. The FP8 Stretch items are the only exceptions.
 - **GPUs:** sm_86 (RTX 3090) and sm_89 (RTX 4090).
-- **GEMM:** `torch::matmul`.
-- **Sizes:** `max_model_len`, `max_num_seqs` and `max_num_batched_tokens` are flags, defaulting to 4096, 256 and 8192; startup requires `max_num_batched_tokens >= max_model_len`. `block_size` is 8, 16 or 32. Tests cover contexts up to 4096 tokens.
-- **Decode kernels are graph-capturable:** no allocation, no host sync, and a launch grid fixed by the maximum sizes rather than by the batch, so CUDA graphs need no kernel rework.
+- **GEMM:** `torch::matmul`, plus `_scaled_mm` for FP8 weights.
+- **Sizes:** `max_model_len`, `max_num_seqs` and `max_num_batched_tokens` are flags, defaulting to 4096, 256 and 8192; until chunked prefill, startup requires `max_num_batched_tokens >= max_model_len`. `block_size` is 8, 16 or 32. Tests cover contexts up to 4096 tokens.
+- **Decode kernels are graph-capturable:** no host sync, no raw `cudaMalloc`; launch grids and buffer sizes depend on the batch size and fixed settings, never on this step's sequence lengths, so CUDA graphs need no kernel rework.
 
 ## Must
 
@@ -49,7 +49,7 @@ These hold for every feature.
 | Feature | Scope | Issues |
 | --- | --- | --- |
 | Chunked prefill | Long prompts split into chunks and batched with decodes | #25 |
-| Data-parallel replicas | Two engine copies on the 2× RTX 4090 server | #26 |
+| Data-parallel replicas | Two engine copies, one per GPU | #26 |
 | Preemption by recompute | Replaces reserving `max_tokens` at admission; recompute only | #11 |
 | FP8 weights | Through LibTorch ops (`_scaled_mm`); sm_89 only | #42 |
 | FP8 KV cache | E4M3, dequantized inside our attention kernels | #43 |
@@ -62,7 +62,7 @@ These hold for every feature.
 | Speculative decoding | No smaller draft model exists for either model |
 | Preemption by swapping KV to host RAM | Recompute only; KV offload covers evicted prefix blocks |
 | fp16 and fp32 inference | Both models ship in bf16 |
-| Weight quantization outside LibTorch ops, our own GEMM kernels | GEMM stays in `torch::matmul` |
+| Weight quantization outside LibTorch ops, our own GEMM kernels | GEMM stays in LibTorch ops (`torch::matmul`, `_scaled_mm`) |
 | LoRA, multimodal input, MoE, other models | Two dense text models |
 | Beam search, `n > 1` | One sequence per request |
 | Stop strings, logprobs, penalties, grammar-constrained output | Generation stops on EOS or `max_tokens` only |

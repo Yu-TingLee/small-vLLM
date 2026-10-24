@@ -21,7 +21,7 @@ We build **small-vLLM**: a C++/CUDA serving engine with a paged KV cache, contin
 | Tensors | Raw CUDA pointers | LibTorch tensors |
 | Tokenizer | Python (Hugging Face) | tokenizers-cpp |
 | Block manager | Paged KV cache | Paged KV cache + prefix caching |
-| Scheduler | Continuous batching; each new prompt is prefilled alone while the batch waits | Continuous batching; waiting prompts prefilled together in one step; preemption by recompute |
+| Scheduler | Continuous batching; each new prompt is prefilled alone while the batch waits | Continuous batching; waiting prompts prefilled together in one step; admission reserves blocks for the prompt plus `max_tokens` (preemption by recompute: stretch) |
 | Prefill attention | Online softmax, FlashAttention-like | FA2-style kernel on paged KV |
 | Decode attention | PagedAttention kernel | Split-KV paged kernel; GQA-aware |
 | GEMM | cuBLAS | `torch::matmul` (cuBLAS on GPU, MKL/oneDNN on CPU) |
@@ -38,26 +38,25 @@ We build **small-vLLM**: a C++/CUDA serving engine with a paged KV cache, contin
 | CPU backend | The whole model on CPU: an OpenMP kernel for every op; GEMM through `torch::matmul` |
 | KV offload to host RAM | Evicted prefix KV is kept in host RAM and copied back on reuse instead of recomputed |
 | Chunked prefill | Long prompts split into chunks and batched with decodes |
-| Data-parallel replicas | Two engine copies on the 2× RTX 4090 lab server |
+| Data-parallel replicas | Two engine copies, one per GPU |
+| FP8 weights | Through LibTorch's `_scaled_mm`; sm_89 only |
+| FP8 KV cache | E4M3, dequantized inside our attention kernels |
 
 ## Architecture
 
 C++20 and CUDA throughout, on the LibTorch bundled with the pinned pip `torch`.
 
 - **One model, ops dispatched by device.** The model forward is written once, so a model fix (QK-norm, Llama RoPE scaling) lands once and the CPU path can't drift from the GPU one. Each op under `ops::` (attention, RMSNorm, RoPE, SiLU, sampling) has a CUDA and an OpenMP kernel and picks one from its input tensor's device, like PyTorch; a missing kernel is an error, not a silent fallback. The engine is built for one `c10::Device`, `cuda:0` by default or `cpu`, the type tensors, ops and the safetensors loader already take; weights, the KV pool and activations live there.
-- **Engine.** Block manager with prefix caching, scheduler with continuous batching and preemption by recompute, KV offload to host RAM, and the engine loop. All device-agnostic.
+- **Engine.** Block manager with prefix caching, scheduler with continuous batching that reserves each request's blocks at admission (preemption by recompute later, stretch), KV offload to host RAM, and the engine loop. All device-agnostic.
+- **bf16 only.** Weights, activations and the KV cache are bf16 on both devices, and ops reject other dtypes. Both models ship in bf16, and one dtype keeps every kernel to one version and one test matrix; adding fp16 later would touch every kernel and its tests. The FP8 stretch items are the only exceptions.
+- **Graph-capturable decode kernels.** Decode kernels never sync with the host or call `cudaMalloc`, and their launch grids and buffer sizes depend on the batch size and fixed settings, never on the step's sequence lengths. A grid sized on the host from sequence lengths gives silently wrong output when a CUDA graph replays it, and retrofitting the split-KV decode kernel (#16) would be a rewrite.
 - **Model.** Loads safetensors weights and `config.json` directly; Qwen3 by default, with Llama 3.2 differences (no QK-norm, llama3 RoPE scaling) behind config flags.
 - **Front ends.** `svllm-bench` (offline, for experiments) and `svllm-serve` (localhost HTTP plus one HTML page, for the demo). Both are thin layers over the same engine API. Changing the device or attention backend restarts the engine with new flags.
 - **Python binding (tests and benchmarks only).** The pybind11 module `svllm_ops` exposes our ops and the engine, so tests can compare them with PyTorch and Hugging Face, and benchmarks with flash-attn and vLLM kernels. Python is never on the serving path.
 
 ## Hardware
 
-| Machine | GPU | Use |
-| --- | --- | --- |
-| Benchmark machine | 1× RTX 3090 (sm_86), always available | Every number in the report, except DP replicas |
-| Lab server (shared, when free) | 2× RTX 4090 (sm_89) | Development; data-parallel replicas |
-
-We build for sm_86 and sm_89 with a CUDA 12.6+ toolkit, matching the pinned torch wheel (cu126); any driver from 525 runs it. Laptops are for editing and the CPU-only build; GPU work runs over SSH, and the demo page is reached through an SSH port forward.
+We target the RTX 3090 (sm_86) and RTX 4090 (sm_89), with a CUDA 12.6+ toolkit to match the pinned torch wheel (cu126); any driver from 525 runs it.
 
 ## Related work
 
@@ -82,7 +81,7 @@ We build for sm_86 and sm_89 with a CUDA 12.6+ toolkit, matching the pinned torc
 
 ## Evaluation plan
 
-Ours against a baseline on the benchmark machine.
+Ours against a baseline on the same GPU.
 
 | Experiment | Metric | Baseline |
 | --- | --- | --- |
@@ -93,7 +92,7 @@ Ours against a baseline on the benchmark machine.
 | Latency | TTFT, TPOT | Static batching |
 | CPU backend | Speedup vs threads | 1 thread; llama.cpp (same precision) |
 | KV offload | Hit rate; TTFT on multi-turn chat | GPU-only prefix cache |
-| DP replicas (stretch) | Tokens/s, 1 vs 2 replicas, on the lab server | 1 replica |
+| DP replicas (stretch) | Tokens/s, 1 vs 2 replicas | 1 replica |
 
 - **Decode / prefill:** decode is limited by memory bandwidth, so we report GB/s. Prefill is limited by compute, so we report TFLOP/s.
 - **GQA group:** how many query heads share one KV head (2 on Qwen3-0.6B, 4 on Llama 3.2 1B).
