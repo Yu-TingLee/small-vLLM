@@ -37,7 +37,7 @@ These hold for every feature.
 
 | Feature | Scope | Issues |
 | --- | --- | --- |
-| Fused ops | RoPE with QK-norm; SiLU-and-mul | #13, #14 |
+| Fused ops | RoPE with QK-norm; SiLU-and-mul; QKV and gate+up weights concatenated at load, one `torch::matmul` each | #13, #14, #48 |
 | Sampling | Temperature, top-k, top-p and `seed`, on the engine's device | #19 |
 | CUDA graphs | Decode steps captured at batch sizes 1, 2, 4, 8, then every 8 up to `max_num_seqs`; batches padded up | #20 |
 | `svllm-serve` | Engine on its own thread; `POST /v1/chat/completions` streamed (SSE) and non-streamed; `GET /stats` with tokens/s, KV usage and prefix hit rate; one demo page; localhost, no auth. Chat formats for Qwen3 (thinking off) and Llama 3 written in C++, picked by `model_type`. | #24 |
