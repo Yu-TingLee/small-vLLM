@@ -41,7 +41,7 @@ cmake/           torch discovery, OpenMP, pinned third-party dependencies
 
 ## Coding standards
 
-- C++20, everything in namespace `svllm`, following the [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html) except that functions and variables are `snake_case`, as in LibTorch. So: files `snake_case`, types `PascalCase`, private members end in `_`, constants and enumerators `kPascalCase`. `.clang-format` enforces the layout.
+- C++20, everything in namespace `svllm`, following the [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html) except that functions and variables are `snake_case`, as in LibTorch. So: files `snake_case`, types `PascalCase`, private members end in `_`, constants and enumerators `kPascalCase`. `.clang-format` enforces the layout. Inside a function, separate the steps with a blank line: input checks, setup, the work, the return.
 - Python (tests, benchmarks, scripts) follows ruff through pre-commit.
 - `.cu` for kernels, `.cuh` only for device code shared between `.cu` files, `.h`/`.cpp` for everything else.
 - Check inputs with `TORCH_CHECK`; host code may throw.
