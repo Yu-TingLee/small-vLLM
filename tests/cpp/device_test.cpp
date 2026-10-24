@@ -11,7 +11,9 @@ TEST(ParseDevice, AcceptsCudaAndCpu) {
   EXPECT_EQ(parse_device("cpu"), Device::kCPU);
 }
 
-TEST(ParseDevice, RejectsUnknownName) { EXPECT_THROW(parse_device("tpu"), c10::Error); }
+TEST(ParseDevice, RejectsUnknownName) {
+  EXPECT_THROW(parse_device("tpu"), c10::Error);
+}
 
 TEST(Describe, CpuReportsThreadCount) {
   EXPECT_NE(describe(Device::kCPU).find("threads"), std::string::npos);
