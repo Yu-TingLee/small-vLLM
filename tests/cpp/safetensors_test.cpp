@@ -68,14 +68,18 @@ std::optional<std::filesystem::path> find_qwen3_snapshot() {
   std::error_code ec;
   for (const auto& snapshot :
        std::filesystem::directory_iterator(hub / "models--Qwen--Qwen3-0.6B" / "snapshots", ec)) {
-    if (std::filesystem::exists(snapshot.path() / "model.safetensors")) return snapshot.path();
+    if (std::filesystem::exists(snapshot.path() / "model.safetensors")) {
+      return snapshot.path();
+    }
   }
   return std::nullopt;
 }
 
 class SafetensorsFile : public ::testing::Test {
  protected:
-  void SetUp() override { torch::manual_seed(0); }
+  void SetUp() override {
+    torch::manual_seed(0);
+  }
 
   // Returns the error message, checking that it names the file
   std::string load_error() const {
@@ -103,7 +107,9 @@ class LoadSafetensors : public SafetensorsFile, public ::testing::WithParamInter
     }
   }
 
-  c10::Device device() const { return GetParam(); }
+  c10::Device device() const {
+    return GetParam();
+  }
 };
 
 TEST_P(LoadSafetensors, RoundTripsToBf16) {
@@ -128,14 +134,18 @@ TEST_P(LoadSafetensors, RoundTripsToBf16) {
 
 TEST_P(LoadSafetensors, Qwen3MatchesItsHeader) {
   const std::optional<std::filesystem::path> dir = find_qwen3_snapshot();
-  if (!dir) GTEST_SKIP() << "Qwen3-0.6B not found; run scripts/download_models.sh";
+  if (!dir) {
+    GTEST_SKIP() << "Qwen3-0.6B not found; run scripts/download_models.sh";
+  }
   const std::filesystem::path path = *dir / "model.safetensors";
 
   const auto weights = load_safetensors(path, device());
   const nlohmann::json header = read_header(path);
   size_t num_tensors = 0;
   for (const auto& [name, info] : header.items()) {
-    if (name == "__metadata__") continue;
+    if (name == "__metadata__") {
+      continue;
+    }
     ++num_tensors;
     ASSERT_TRUE(weights.contains(name)) << name;
     const torch::Tensor& t = weights.at(name);

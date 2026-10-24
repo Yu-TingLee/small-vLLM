@@ -39,13 +39,20 @@ class MappedFile {
                 std::strerror(mmap_errno));
   }
 
-  ~MappedFile() { ::munmap(data_, size_); }
+  ~MappedFile() {
+    ::munmap(data_, size_);
+  }
 
   MappedFile(const MappedFile&) = delete;
   MappedFile& operator=(const MappedFile&) = delete;
 
-  const std::byte* data() const { return static_cast<const std::byte*>(data_); }
-  size_t size() const { return size_; }
+  const std::byte* data() const {
+    return static_cast<const std::byte*>(data_);
+  }
+
+  size_t size() const {
+    return size_;
+  }
 
  private:
   void* data_ = MAP_FAILED;
@@ -93,7 +100,9 @@ std::unordered_map<std::string, torch::Tensor> parse_safetensors(const std::file
 
   std::vector<TensorEntry> entries;
   for (const auto& [name, info] : header.items()) {
-    if (name == "__metadata__") continue;
+    if (name == "__metadata__") {
+      continue;
+    }
     const std::string tensor_desc = "tensor '" + name + "' in " + path.string();
 
     TORCH_CHECK(info.is_object() && info.contains("dtype") && info.at("dtype").is_string() &&
