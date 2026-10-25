@@ -1,6 +1,7 @@
 add_library(svllm STATIC
   engine/device.cpp
   model/config.cpp
+  model/safetensors.cpp
 )
 target_sources(svllm PRIVATE
   ops/rms_norm.cpp
