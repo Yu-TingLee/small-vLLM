@@ -37,7 +37,9 @@ __device__ float block_sum(float value) {
   for (int offset = kWarpSize / 2; offset > 0; offset /= 2) {
     value += __shfl_xor_sync(0xffffffff, value, offset);
   }
-  if (lane == 0) warp_sums[warp] = value;
+  if (lane == 0) {
+    warp_sums[warp] = value;
+  }
   __syncthreads();
 
   if (warp == 0) {
@@ -45,7 +47,9 @@ __device__ float block_sum(float value) {
     for (int offset = kWarpSize / 2; offset > 0; offset /= 2) {
       value += __shfl_xor_sync(0xffffffff, value, offset);
     }
-    if (lane == 0) total = value;
+    if (lane == 0) {
+      total = value;
+    }
   }
   __syncthreads();
   return total;
@@ -102,7 +106,9 @@ void rms_norm(const at::Tensor& out, const at::Tensor& x, const at::Tensor& weig
   TORCH_CHECK(hidden64 <= kIntMax && rows <= kIntMax, "rms_norm: ", rows, " rows of ", hidden64,
               " exceed the CUDA kernel's int32 grid and index range");
   const int hidden = static_cast<int>(hidden64);
-  if (rows == 0) return;
+  if (rows == 0) {
+    return;
+  }
 
   const c10::cuda::CUDAGuard device_guard(x.device());
   const cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
