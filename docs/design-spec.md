@@ -103,4 +103,4 @@ Ours against a baseline on the same GPU.
 
 - Every op matches PyTorch within bf16 tolerance, on both devices.
 - Greedy output matches Hugging Face end to end on a few prompts.
-- Block manager and scheduler edge cases (prefix hits, eviction, preemption) have C++ unit tests.
+- Block manager and scheduler edge cases (prefix hits, eviction, admission when blocks run short) have C++ unit tests.

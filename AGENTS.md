@@ -54,7 +54,7 @@ Test where it pays off:
 
 - **Each op:** one parametrized pytest against PyTorch at bf16 tolerance over a few shapes, including GQA ratios and block-size edges.
 - **The engine:** one end-to-end test that greedy output matches Hugging Face on a few prompts.
-- **Block manager and scheduler:** googletest cases for the tricky paths (prefix hits, eviction, preemption).
+- **Block manager and scheduler:** googletest cases for the tricky paths (prefix hits, eviction, admission when blocks run short).
 - Getters, glue code and CLI flags need no tests.
 
 ## Rules
