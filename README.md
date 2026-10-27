@@ -6,6 +6,7 @@ A C++/CUDA LLM inference engine on LibTorch: paged KV cache with prefix caching,
 
 - Linux with an NVIDIA GPU, CUDA 12.6+ and GCC 11+
 - [uv](https://docs.astral.sh/uv/)
+- [Rust](https://rustup.rs/) 1.81+ (`cargo`), which builds the tokenizer library
 
 ## Quickstart
 

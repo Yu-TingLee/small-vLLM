@@ -26,6 +26,8 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       SVLLM_BUILD_DIR: build/cpu
+      # Downloads Llama's gated tokenizer.json. Fork PRs get no secrets, so that test skips there.
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0

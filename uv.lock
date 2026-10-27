@@ -979,9 +979,11 @@ cu126 = [
 [package.dev-dependencies]
 dev = [
     { name = "cmake" },
+    { name = "huggingface-hub" },
     { name = "ninja" },
     { name = "pre-commit" },
     { name = "pytest" },
+    { name = "tokenizers" },
     { name = "transformers" },
 ]
 lint = [
@@ -998,9 +1000,11 @@ provides-extras = ["cpu", "cu126"]
 [package.metadata.requires-dev]
 dev = [
     { name = "cmake", specifier = ">=3.28" },
+    { name = "huggingface-hub", specifier = ">=2.2.0" },
     { name = "ninja", specifier = ">=1.11" },
     { name = "pre-commit", specifier = ">=4.6,<4.7" },
     { name = "pytest", specifier = ">=8" },
+    { name = "tokenizers", specifier = ">=0.23.3" },
     { name = "transformers", specifier = ">=4.56" },
 ]
 lint = [{ name = "pre-commit", specifier = ">=4.6,<4.7" }]
