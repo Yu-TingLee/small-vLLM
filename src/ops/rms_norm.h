@@ -8,6 +8,8 @@ namespace svllm::ops {
 // Formula:    out = bf16(x / sqrt(mean(x^2) + eps)) * weight, with the sum accumulated in fp32.
 // Domain:     x [..., hidden] and weight [hidden], contiguous bf16 on one device; hidden > 0.
 // Returns:    A new bf16 tensor shaped like x, on x's device.
+// Throws:     c10::Error if x or weight is not bf16, their shapes don't match, either is not
+//             contiguous, they are on different devices, or x's device has no kernel.
 at::Tensor rms_norm(const at::Tensor& x, const at::Tensor& weight, double eps);
 
 }  // namespace svllm::ops

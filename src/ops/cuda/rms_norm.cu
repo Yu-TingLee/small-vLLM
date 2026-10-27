@@ -65,7 +65,7 @@ __global__ void rms_norm_kernel(__nv_bfloat16* __restrict__ out,
                                 const __nv_bfloat16* __restrict__ weight, int hidden, float eps) {
   const int64_t offset = static_cast<int64_t>(blockIdx.x) * hidden;
   const auto* x_row = reinterpret_cast<const BF16Vec<N>*>(x + offset);
-  const auto* w = reinterpret_cast<const BF16Vec<N>*>(weight);
+  const auto* weight_vecs = reinterpret_cast<const BF16Vec<N>*>(weight);
   auto* out_row = reinterpret_cast<BF16Vec<N>*>(out + offset);
   const int num_vecs = hidden / N;
 
@@ -82,7 +82,7 @@ __global__ void rms_norm_kernel(__nv_bfloat16* __restrict__ out,
 
   for (int i = threadIdx.x; i < num_vecs; i += blockDim.x) {
     const BF16Vec<N> xv = x_row[i];
-    const BF16Vec<N> wv = w[i];
+    const BF16Vec<N> wv = weight_vecs[i];
     BF16Vec<N> ov;
 #pragma unroll
     for (int j = 0; j < N; ++j) {
@@ -102,11 +102,11 @@ bool is_vec_aligned(const void* ptr) {
 void rms_norm(const at::Tensor& out, const at::Tensor& x, const at::Tensor& weight, double eps) {
   constexpr int64_t kIntMax = std::numeric_limits<int>::max();
   const int64_t hidden64 = x.size(-1);
-  const int64_t rows = x.numel() / hidden64;
-  TORCH_CHECK(hidden64 <= kIntMax && rows <= kIntMax, "rms_norm: ", rows, " rows of ", hidden64,
-              " exceed the CUDA kernel's int32 grid and index range");
+  const int64_t num_rows = x.numel() / hidden64;
+  TORCH_CHECK(hidden64 <= kIntMax && num_rows <= kIntMax, "rms_norm: ", num_rows, " rows of ",
+              hidden64, " exceed the CUDA kernel's int32 grid and index range");
   const int hidden = static_cast<int>(hidden64);
-  if (rows == 0) {
+  if (num_rows == 0) {
     return;
   }
 
@@ -119,12 +119,12 @@ void rms_norm(const at::Tensor& out, const at::Tensor& x, const at::Tensor& weig
   // A row can only be loaded in 16-byte vectors if every row starts on a 16-byte boundary
   const bool vectorized = hidden % kVecSize == 0 && is_vec_aligned(out_ptr) &&
                           is_vec_aligned(x_ptr) && is_vec_aligned(w_ptr);
-  const int vecs_per_row = vectorized ? hidden / kVecSize : hidden;
-  const int threads = std::min(kMaxThreads, at::round_up(vecs_per_row, kWarpSize));
+  const int num_vecs_per_row = vectorized ? hidden / kVecSize : hidden;
+  const int num_threads = std::min(kMaxThreads, at::round_up(num_vecs_per_row, kWarpSize));
 
   const auto kernel = vectorized ? rms_norm_kernel<kVecSize> : rms_norm_kernel<1>;
-  kernel<<<static_cast<unsigned int>(rows), threads, 0, stream>>>(out_ptr, x_ptr, w_ptr, hidden,
-                                                                  static_cast<float>(eps));
+  kernel<<<static_cast<unsigned int>(num_rows), num_threads, 0, stream>>>(
+      out_ptr, x_ptr, w_ptr, hidden, static_cast<float>(eps));
   C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 

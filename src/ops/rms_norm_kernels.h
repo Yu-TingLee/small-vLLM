@@ -19,6 +19,7 @@ void rms_norm(const at::Tensor& out, const at::Tensor& x, const at::Tensor& weig
 // Formula:    As ops::rms_norm.
 // Domain:     Inputs already validated by ops::rms_norm; at most 2^31 - 1 rows.
 // Returns:    Nothing; out holds the normalized rows once the stream reaches the kernel.
+// Throws:     c10::Error if the rows or hidden exceed the int32 range, or the launch fails.
 namespace cuda_impl {
 void rms_norm(const at::Tensor& out, const at::Tensor& x, const at::Tensor& weight, double eps);
 }

@@ -12,15 +12,15 @@ namespace svllm::ops::cpu_impl {
 
 void rms_norm(const at::Tensor& out, const at::Tensor& x, const at::Tensor& weight, double eps) {
   const int64_t hidden = x.size(-1);
-  const int64_t rows = x.numel() / hidden;
+  const int64_t num_rows = x.numel() / hidden;
   const auto* x_data = x.const_data_ptr<at::BFloat16>();
-  const auto* w = weight.const_data_ptr<at::BFloat16>();
+  const auto* weight_data = weight.const_data_ptr<at::BFloat16>();
   auto* out_data = out.mutable_data_ptr<at::BFloat16>();
   const float eps_f = static_cast<float>(eps);
 
   // OpenMP threads from torch's pool, so a decode step's few rows run inline without a fork
   const int64_t grain = std::max<int64_t>(1, at::internal::GRAIN_SIZE / hidden);
-  at::parallel_for(0, rows, grain, [&](int64_t begin, int64_t end) {
+  at::parallel_for(0, num_rows, grain, [&](int64_t begin, int64_t end) {
     for (int64_t row = begin; row < end; ++row) {
       const at::BFloat16* x_row = x_data + row * hidden;
       at::BFloat16* out_row = out_data + row * hidden;
@@ -37,7 +37,7 @@ void rms_norm(const at::Tensor& out, const at::Tensor& x, const at::Tensor& weig
       for (int64_t i = 0; i < hidden; ++i) {
         // Round to bf16 before scaling by the weight, as Hugging Face's Qwen3 and Llama do
         const at::BFloat16 normed = static_cast<float>(x_row[i]) * inv_rms;
-        out_row[i] = static_cast<float>(normed) * static_cast<float>(w[i]);
+        out_row[i] = static_cast<float>(normed) * static_cast<float>(weight_data[i]);
       }
     }
   });

@@ -20,6 +20,7 @@ at::Tensor rms_norm(const at::Tensor& x, const at::Tensor& weight, double eps) {
               weight.device());
 
   at::Tensor out = x.new_empty(x.sizes());
+
   switch (x.device().type()) {
     case c10::DeviceType::CPU:
       cpu_impl::rms_norm(out, x, weight, eps);
@@ -32,6 +33,7 @@ at::Tensor rms_norm(const at::Tensor& x, const at::Tensor& weight, double eps) {
     default:
       TORCH_CHECK(false, "rms_norm: unsupported device ", x.device());
   }
+
   return out;
 }
 
