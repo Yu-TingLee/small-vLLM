@@ -10,7 +10,9 @@
 namespace svllm {
 
 c10::Device parse_device(std::string_view name) {
-  if (name == "cuda") return c10::Device(c10::kCUDA, 0);
+  if (name == "cuda") {
+    return c10::Device(c10::kCUDA, 0);
+  }
   TORCH_CHECK(name == "cpu", "unknown device '", name, "'; expected 'cuda' or 'cpu'");
   return c10::kCPU;
 }
