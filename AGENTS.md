@@ -47,7 +47,7 @@ cmake/           torch discovery, OpenMP, pinned third-party dependencies
 - Check inputs with `TORCH_CHECK`; host code may throw.
 - An op is declared in `src/ops/<op>.h`, with kernels in `src/ops/cuda/<op>.cu` and `src/ops/cpu/<op>.cpp`, and dispatches on its input's device. An op ships both kernels in one PR and errors on an unsupported device. Attention is the exception: its CPU kernels come with the CPU backend, and until then it errors on CPU.
 - Read model sizes from `config.json`. Shapes, paths and GPU architectures come from config or arguments.
-- C++ deps: FetchContent in `cmake/dependencies.cmake`, pinned to a release tarball and its SHA256. Python deps: `uv add`, and commit `uv.lock`.
+- C++ deps: FetchContent in `cmake/dependencies.cmake`, pinned to a release tarball, or a commit tarball when no release builds, and its SHA256. Python deps: `uv add`, and commit `uv.lock`.
 
 ### Names
 
