@@ -9,6 +9,7 @@ EPS = 1e-6
 SHAPES = [
     (0, 1024),  # an empty batch: no kernel launch
     (1, 128),  # one token, Qwen3 head_dim for QK-norm: fewer vectors than one warp
+    (4, 64),  # Llama head_dim: 8 vectors per row, a quarter of a warp
     (7, 1024),  # Qwen3-0.6B hidden size
     (2, 5, 2048),  # Llama 3.2 1B hidden size, batch and sequence dims flattened into rows
     (3, 4100),  # not a multiple of 8: the one-element-at-a-time path, several per thread
@@ -52,8 +53,13 @@ def test_matches_torch_on_unaligned_rows(device):
             torch.ones(8, dtype=torch.bfloat16, device="meta"),
             "unsupported device",
         ),
+        (
+            torch.ones(2, 8, dtype=torch.bfloat16),
+            torch.ones(8, dtype=torch.bfloat16, device="meta"),
+            "but weight is on",
+        ),
     ],
-    ids=["fp32", "weight-mismatch", "non-contiguous", "meta-device"],
+    ids=["fp32", "weight-mismatch", "non-contiguous", "meta-device", "device-mismatch"],
 )
 def test_rejects_invalid_inputs(x, weight, message):
     with pytest.raises(RuntimeError, match=message):

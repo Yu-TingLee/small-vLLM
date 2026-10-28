@@ -69,8 +69,9 @@ __global__ void rms_norm_kernel(__nv_bfloat16* __restrict__ out,
   auto* out_row = reinterpret_cast<BF16Vec<N>*>(out + offset);
   const int num_vecs = hidden / N;
 
+  // A 64-bit index, so stepping past num_vecs near INT_MAX can't overflow
   float sum_sq = 0.0f;
-  for (int i = threadIdx.x; i < num_vecs; i += blockDim.x) {
+  for (int64_t i = threadIdx.x; i < num_vecs; i += blockDim.x) {
     const BF16Vec<N> xv = x_row[i];
 #pragma unroll
     for (int j = 0; j < N; ++j) {
@@ -80,7 +81,7 @@ __global__ void rms_norm_kernel(__nv_bfloat16* __restrict__ out,
   }
   const float inv_rms = rsqrtf(block_sum(sum_sq) / hidden + eps);
 
-  for (int i = threadIdx.x; i < num_vecs; i += blockDim.x) {
+  for (int64_t i = threadIdx.x; i < num_vecs; i += blockDim.x) {
     const BF16Vec<N> xv = x_row[i];
     const BF16Vec<N> wv = weight_vecs[i];
     BF16Vec<N> ov;
@@ -112,19 +113,20 @@ void rms_norm(const at::Tensor& out, const at::Tensor& x, const at::Tensor& weig
 
   const c10::cuda::CUDAGuard device_guard(x.device());
   const cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
-  auto* out_ptr = reinterpret_cast<__nv_bfloat16*>(out.mutable_data_ptr());
-  const auto* x_ptr = reinterpret_cast<const __nv_bfloat16*>(x.const_data_ptr());
-  const auto* w_ptr = reinterpret_cast<const __nv_bfloat16*>(weight.const_data_ptr());
+  auto* out_ptr = reinterpret_cast<__nv_bfloat16*>(out.mutable_data_ptr<at::BFloat16>());
+  const auto* x_ptr = reinterpret_cast<const __nv_bfloat16*>(x.const_data_ptr<at::BFloat16>());
+  const auto* weight_ptr =
+      reinterpret_cast<const __nv_bfloat16*>(weight.const_data_ptr<at::BFloat16>());
 
   // A row can only be loaded in 16-byte vectors if every row starts on a 16-byte boundary
   const bool vectorized = hidden % kVecSize == 0 && is_vec_aligned(out_ptr) &&
-                          is_vec_aligned(x_ptr) && is_vec_aligned(w_ptr);
+                          is_vec_aligned(x_ptr) && is_vec_aligned(weight_ptr);
   const int num_vecs_per_row = vectorized ? hidden / kVecSize : hidden;
   const int num_threads = std::min(kMaxThreads, at::round_up(num_vecs_per_row, kWarpSize));
 
   const auto kernel = vectorized ? rms_norm_kernel<kVecSize> : rms_norm_kernel<1>;
   kernel<<<static_cast<unsigned int>(num_rows), num_threads, 0, stream>>>(
-      out_ptr, x_ptr, w_ptr, hidden, static_cast<float>(eps));
+      out_ptr, x_ptr, weight_ptr, hidden, static_cast<float>(eps));
   C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 
