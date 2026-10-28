@@ -44,7 +44,7 @@ cmake/           torch discovery, OpenMP, pinned third-party dependencies
 - C++20, everything in namespace `svllm`, following the [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html) except that functions and variables are `snake_case`, as in LibTorch. So: files `snake_case`, types `PascalCase`, private members end in `_`, constants and enumerators `kPascalCase`. `.clang-format` enforces the layout. Inside a function, separate the steps with a blank line: input checks, setup, the work, the return.
 - Python (tests, benchmarks, scripts) follows ruff through pre-commit.
 - `.cu` for kernels, `.cuh` only for device code shared between `.cu` files, `.h`/`.cpp` for everything else.
-- Check inputs with `TORCH_CHECK`; host code may throw.
+- Check inputs with `TORCH_CHECK`; host code may throw. No owning raw pointers: hold a resource in `std::unique_ptr` (with a deleter for a C handle) or a container, so a class needs no destructor or copy/move code (Rule of Zero). Raw pointers that only borrow, like kernel arguments and `data_ptr()`, are fine.
 - An op is declared in `src/ops/<op>.h` and defined in `src/ops/<op>.cpp`, which checks inputs and dispatches on the input's device to `cpu_impl::<op>` (`src/ops/cpu/<op>.cpp`) or `cuda_impl::<op>` (`src/ops/cuda/<op>.cu`), both declared in `src/ops/<op>_kernels.h`. An op ships both kernels in one PR and errors on an unsupported device. Attention is the exception: its CPU kernels come with the CPU backend, and until then it errors on CPU.
 - Read model sizes from `config.json`. Shapes, paths and GPU architectures come from config or arguments.
 - C++ deps: FetchContent in `cmake/dependencies.cmake`, pinned to a release tarball and its SHA256. Python deps: `uv add`, and commit `uv.lock`.
