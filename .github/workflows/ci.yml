@@ -36,3 +36,8 @@ jobs:
       - run: uv run cmake --build --preset cpu
       - run: uv run ctest --preset cpu
       - run: uv run pytest
+        # Only this step sees the token, not cargo's third-party build scripts. It downloads Llama's
+        # gated tokenizer.json; fork PRs get no secrets, so that test skips there and fails elsewhere.
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SVLLM_REQUIRE_GATED: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
