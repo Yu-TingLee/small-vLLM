@@ -16,15 +16,14 @@ class Tokenizer {
   // Loads a tokenizer.json. Throws c10::Error if the file can't be read; aborts if it isn't a
   // valid tokenizer.json.
   explicit Tokenizer(const std::filesystem::path& tokenizer_json);
-  Tokenizer(Tokenizer&&) = default;
-  Tokenizer& operator=(Tokenizer&&) = default;
 
   // Same as Hugging Face's Tokenizer.encode(text). Throws c10::Error if text isn't valid UTF-8
   // or the Tokenizer was moved from.
   std::vector<int32_t> encode(std::string_view text);
 
-  // Same as Hugging Face's Tokenizer.decode(token_ids), so special tokens are dropped. Throws
-  // c10::Error on an id outside the vocabulary or if the Tokenizer was moved from.
+  // Same as Hugging Face's Tokenizer.decode(token_ids), so special tokens and ids at or above the
+  // vocabulary size are dropped. Throws c10::Error on a negative id or if the Tokenizer was moved
+  // from.
   std::string decode(std::span<const int32_t> token_ids);
 
  private:
@@ -33,7 +32,6 @@ class Tokenizer {
   };
 
   std::unique_ptr<void, FreeHandle> handle_;  // The Rust tokenizer; null after a move.
-  int64_t vocab_size_ = 0;
 };
 
 }  // namespace svllm

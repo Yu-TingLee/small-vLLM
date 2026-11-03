@@ -1,4 +1,5 @@
-# Third-party C++ dependencies, each pinned to a release tarball and its SHA256.
+# Third-party C++ dependencies, each pinned to a release tarball, or a commit tarball when no release
+# builds, and its SHA256.
 include(FetchContent)
 
 FetchContent_Declare(json

@@ -10,6 +10,8 @@ MIN_DRIVER=525
 MIN_CUDA=12.6
 TORCH_CUDA=12.6
 MIN_CMAKE=3.26
+# The oldest rustc that builds cmake/tokenizers_c.Cargo.lock.
+MIN_CARGO=1.85
 
 cd "$(dirname "$0")/.."
 failed=0
@@ -104,6 +106,17 @@ else
     report PASS cmake "$cmake_version"
   else
     report FAIL cmake "$cmake_version; needs $MIN_CMAKE or later"
+  fi
+fi
+
+if ! cargo_version=$(cargo --version 2>/dev/null); then
+  report FAIL cargo "not found; install Rust from https://rustup.rs"
+else
+  cargo_version=$(cut -d' ' -f2 <<<"$cargo_version")
+  if version_ge "${cargo_version%%-*}" "$MIN_CARGO"; then
+    report PASS cargo "$cargo_version"
+  else
+    report FAIL cargo "$cargo_version; needs $MIN_CARGO or later"
   fi
 fi
 

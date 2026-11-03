@@ -1,3 +1,4 @@
+import os
 import re
 
 import pytest
@@ -37,6 +38,9 @@ TEXTS = [
 def tokenizer_path(request):
     repo, revision, gated = MODELS[request.param]
     if gated and get_token() is None:
+        # CI sets this outside fork PRs, which get no secrets, so a lost token can't pass silently.
+        if os.environ.get("SVLLM_REQUIRE_GATED") == "true":
+            pytest.fail(f"{repo} is gated and HF_TOKEN is unset")
         pytest.skip(f"{repo} is gated; set HF_TOKEN to an account with access")
     return hf_hub_download(repo, "tokenizer.json", revision=revision)
 
@@ -61,10 +65,18 @@ def test_encode_rejects_invalid_utf8(tokenizer_path, text):
         tok.encode(text)
 
 
-def test_decode_rejects_ids_outside_vocab(tokenizer_path):
-    vocab_size = Tokenizer.from_file(tokenizer_path).get_vocab_size(with_added_tokens=True)
+# Qwen3's model has more outputs than its tokenizer has tokens, so sampling can yield such ids.
+def test_decode_drops_ids_past_vocab(tokenizer_path):
+    ref = Tokenizer.from_file(tokenizer_path)
+    vocab_size = ref.get_vocab_size(with_added_tokens=True)
+    tok = svllm_ops.Tokenizer(tokenizer_path)
+    ids = ref.encode("Hello").ids + [vocab_size, 2**31 - 1]
+
+    assert tok.decode(ids) == ref.decode(ids)
+
+
+def test_decode_rejects_negative_ids(tokenizer_path):
     tok = svllm_ops.Tokenizer(tokenizer_path)
 
-    for bad_id in (-1, vocab_size):
-        with pytest.raises(RuntimeError, match="outside the vocabulary"):
-            tok.decode([bad_id])
+    with pytest.raises(RuntimeError, match="is negative"):
+        tok.decode([-1])
