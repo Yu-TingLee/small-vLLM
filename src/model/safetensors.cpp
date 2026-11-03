@@ -13,6 +13,7 @@
 #include <cerrno>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -25,38 +26,39 @@ namespace {
 static_assert(std::endian::native == std::endian::little,
               "safetensors stores little-endian values and big-endian hosts are not supported");
 
+struct Unmap {
+  size_t size = 0;
+
+  void operator()(void* data) const {
+    ::munmap(data, size);
+  }
+};
+
 class MappedFile {
  public:
-  explicit MappedFile(const std::filesystem::path& path) : size_(std::filesystem::file_size(path)) {
-    TORCH_CHECK(size_ >= sizeof(uint64_t), path.string(), " is truncated: ", size_,
+  explicit MappedFile(const std::filesystem::path& path) {
+    const size_t size = std::filesystem::file_size(path);
+    TORCH_CHECK(size >= sizeof(uint64_t), path.string(), " is truncated: ", size,
                 " bytes, too short for the 8-byte header length");
     const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
     TORCH_CHECK(fd >= 0, "cannot open ", path.string(), ": ", std::strerror(errno));
-    data_ = ::mmap(nullptr, size_, PROT_READ, MAP_PRIVATE, fd, 0);
+    void* data = ::mmap(nullptr, size, PROT_READ, MAP_PRIVATE, fd, 0);
     const int mmap_errno = errno;
     ::close(fd);
-    TORCH_CHECK(data_ != MAP_FAILED, "cannot mmap ", path.string(), ": ",
-                std::strerror(mmap_errno));
+    TORCH_CHECK(data != MAP_FAILED, "cannot mmap ", path.string(), ": ", std::strerror(mmap_errno));
+    mapping_ = std::unique_ptr<void, Unmap>(data, Unmap{size});
   }
-
-  ~MappedFile() {
-    ::munmap(data_, size_);
-  }
-
-  MappedFile(const MappedFile&) = delete;
-  MappedFile& operator=(const MappedFile&) = delete;
 
   const std::byte* data() const {
-    return static_cast<const std::byte*>(data_);
+    return static_cast<const std::byte*>(mapping_.get());
   }
 
   size_t size() const {
-    return size_;
+    return mapping_.get_deleter().size;
   }
 
  private:
-  void* data_ = MAP_FAILED;
-  size_t size_ = 0;
+  std::unique_ptr<void, Unmap> mapping_;
 };
 
 struct TensorEntry {
