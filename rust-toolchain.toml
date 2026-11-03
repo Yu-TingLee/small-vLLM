@@ -1,0 +1,5 @@
+# rustup builds tokenizers-cpp with this Rust: its v0.1.1 broke on a newer one. 1.85 is also the
+# oldest that builds cmake/tokenizers_c.Cargo.lock.
+[toolchain]
+channel = "1.85.0"
+profile = "minimal"

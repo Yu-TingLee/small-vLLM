@@ -34,6 +34,8 @@ add_custom_command(
   COMMAND ${CARGO_EXECUTABLE} build --release --locked
           --manifest-path ${tokenizers_cpp_SOURCE_DIR}/rust/Cargo.toml
           --target-dir ${tokenizers_cpp_BINARY_DIR}
+  # rustup reads rust-toolchain.toml from the working directory up.
+  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
   DEPENDS ${tokenizers_cpp_SOURCE_DIR}/rust/Cargo.lock
   COMMENT "Building tokenizers-cpp's Rust library")
 add_custom_target(tokenizers_c_build DEPENDS ${tokenizers_c_lib})
